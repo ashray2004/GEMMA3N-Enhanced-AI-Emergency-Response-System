@@ -1,6 +1,7 @@
 # requirements.txt - Dependencies for Disaster Response Assistant with Gemma 3n
 
 # Core Framework
+python>=3.10
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0

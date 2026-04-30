@@ -1,0 +1,1120 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Disaster Response & Recovery Assistant</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
+    /* Edge AI Status Indicators */
+    .ai-status-bar {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.9rem;
+    }
+    
+    .ai-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00ff00;
+      animation: pulse 2s infinite;
+    }
+    
+    .ai-status-dot.loading {
+      background: #ffaa00;
+    }
+    
+    .ai-status-dot.error {
+      background: #ff0000;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.9); }
+    }
+    
+    /* Real-time Analysis Panel */
+    .realtime-analysis {
+      background: rgba(37, 99, 235, 0.05);
+      border: 2px solid #2563eb;
+      border-radius: 12px;
+      padding: 1rem;
+      margin-top: 1rem;
+      display: none;
+      transition: all 0.3s ease;
+    }
+    
+    .realtime-analysis.visible {
+      display: block;
+      animation: slideIn 0.3s ease;
+    }
+    
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .analysis-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      font-weight: bold;
+      color: #1e40af;
+    }
+    
+    .severity-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      color: white;
+    }
+    
+    .severity-low { background: #16a34a; }
+    .severity-medium { background: #d97706; }
+    .severity-high { background: #dc2626; }
+    .severity-critical { background: #991b1b; animation: blink 1s infinite; }
+    
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    
+    .panic-indicator {
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      margin-left: 0.5rem;
+    }
+    
+    .panic-calm { background: #dcfce7; color: #166534; }
+    .panic-concerned { background: #fef3c7; color: #92400e; }
+    .panic-elevated { background: #fecaca; color: #991b1b; }
+    .panic-critical { background: #dc2626; color: white; animation: blink 1s infinite; }
+    
+    .ai-recommendations {
+      background: #f8fafc;
+      border-left: 4px solid #3b82f6;
+      padding: 0.75rem;
+      margin-top: 1rem;
+      border-radius: 0 8px 8px 0;
+    }
+    
+    .ai-recommendations h4 {
+      margin: 0 0 0.5rem 0;
+      color: #1e40af;
+      font-size: 0.9rem;
+    }
+    
+    .ai-recommendations ul {
+      margin: 0;
+      padding-left: 1.2rem;
+    }
+    
+    .ai-recommendations li {
+      margin-bottom: 0.25rem;
+      font-size: 0.85rem;
+      color: #374151;
+    }
+    
+    .processing-indicator {
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+      color: #6b7280;
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+    }
+    
+    .processing-indicator.active {
+      display: flex;
+    }
+    
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #e5e7eb;
+      border-top: 2px solid #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Image Analysis Preview */
+    .image-analysis-preview {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #f9fafb;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      display: none;
+    }
+    
+    .image-analysis-preview.visible {
+      display: block;
+      animation: fadeIn 0.5s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    .hazard-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    
+    .hazard-tag {
+      background: #dc2626;
+      color: white;
+      padding: 0.25rem 0.5rem;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    
+    .confidence-bar {
+      width: 100%;
+      height: 6px;
+      background: #e5e7eb;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+    
+    .confidence-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #dc2626, #16a34a);
+      transition: width 0.5s ease;
+    }
+
+    /* Drone-specific styling */
+    .drone-section {
+      background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%);
+      color: white;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+    }
+    
+    .drone-section label {
+      color: white;
+      font-weight: bold;
+    }
+    
+    #droneImageAnalysisPreview {
+      background: rgba(14, 165, 233, 0.1);
+      border: 2px solid #0ea5e9;
+    }
+    
+    #droneImageAnalysisPreview h4 {
+      color: #0369a1;
+    }
+
+    /* Context selector styling */
+    #contextSelect {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      background: white;
+    }
+
+    #contextSelect:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <div class="logo">🆘</div>
+      <div>
+        <h1 class="title">Disaster Response & Recovery Assistant</h1>
+        <a href="/live-generate" style="display: inline-block; margin-top: 1rem; padding: 0.5rem 1rem; background-color: #1e40af; color: #fff; border-radius: 6px; text-decoration: none;">
+          🧩 Live JSON → PDF Editor
+        </a>        
+        <p class="subtitle">AI-Powered Emergency Analysis & Support</p>
+      </div>
+      <div class="controls">
+        <button id="toggleThemeBtn" aria-label="Toggle dark/light theme">🌓 Toggle Theme</button>
+        <button id="contrastToggleBtn" aria-label="Toggle high contrast mode">♿ High Contrast</button>
+        <div class="status-bar">
+          <div class="status-indicator status-offline">
+            <div class="status-dot"></div>
+            Offline Ready
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Edge AI Status Bar -->
+    <div class="ai-status-bar" id="aiStatusBar">
+      <div class="ai-status-dot loading" id="aiStatusDot"></div>
+      <span id="aiStatusText">🧠 Loading Edge AI models...</span>
+      <button onclick="window.EdgeAI?.runDiagnostics()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; margin-left: auto;">
+        🧪 Test AI
+      </button>
+    </div>
+
+    <div class="main-card">
+      <!-- Sync Queue UI -->
+<div class="sync-queue-card" id="syncQueueCard" style="display: none; margin-top: 2rem; padding: 1rem; background: #fff7ed; border: 1px solid #fdba74; border-radius: 8px;">
+  <h3 style="margin-bottom: 0.5rem;">📡 Offline Report Sync Queue</h3>
+  <ul id="syncQueueList" style="padding-left: 1rem; font-size: 0.9rem;"></ul>
+  <button id="syncNowBtn" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #16a34a; color: white; border: none; border-radius: 4px;">🔄 Sync Now</button>
+</div>
+      <form id="analysisForm" method="post" action="/analyze" enctype="multipart/form-data">
+        <div class="form-section">
+          <label for="report_text">📝 Situation Description (Optional):</label>
+          <textarea id="report_text" name="report_text" rows="4"
+            placeholder="Ex: Building collapse near 5th Ave..."
+            aria-label="Describe the situation"></textarea>
+          
+          <!-- Processing Indicator -->
+          <div class="processing-indicator" id="textProcessing">
+            <div class="spinner"></div>
+            <span>Analyzing text for emergency indicators...</span>
+          </div>
+
+          <label for="audioUpload">🎙️ Upload Voice Note</label>
+          <input type="file" id="audioUpload" name="audio" accept=".wav,.mp3,.m4a,.webm"
+            aria-label="Upload voice file" />
+
+          <button type="button" id="recordBtn" aria-label="Start or stop recording">🎤 Start Recording</button>
+          <span id="recordStatus">Idle</span>
+          <audio id="playback" controls style="display:none;"></audio>
+        </div>
+
+        <div class="form-section">
+          <label>📍 Priority Level:</label>
+          <div class="priority-selector" role="radiogroup" aria-label="Priority level">
+            <label><input type="radio" name="priority" value="critical" />🔴 Critical</label>
+            <label><input type="radio" name="priority" value="urgent" checked />🟠 Urgent</label>
+            <label><input type="radio" name="priority" value="medium" />🟡 Medium</label>
+            <label><input type="radio" name="priority" value="low" />🟢 Low</label>
+          </div>
+        </div>
+
+        <!-- Scenario Context Selector -->
+        <div class="form-section">
+          <label for="contextSelect">🗺️ Scenario Context:</label>
+          <select id="contextSelect" name="context">
+            <option value="">-- Select Scenario --</option>
+            <option value="urban_fire">🔥 Urban Fire</option>
+            <option value="flooding">🌊 Flooding</option>
+            <option value="earthquake">🌎 Earthquake</option>
+            <option value="chemical_spill">☣️ Chemical Spill</option>
+            <option value="storm_damage">🌪️ Storm Damage</option>
+          </select>
+        </div>
+
+        <!-- Map Pin Drop -->
+        <div class="form-section" style="margin-top: 1rem;">
+          <label for="map">🗺️ Click on the map to tag location:</label>
+          <div id="reportMap" style="height: 300px; border-radius: 8px; margin-top: 0.5rem;"></div>
+          <input type="hidden" id="latitude" name="latitude">
+          <input type="hidden" id="longitude" name="longitude">
+        </div>
+
+        <div class="form-section">
+          <label for="file">📎 Upload Evidence (Image)</label>
+          <input type="file" name="file" id="file" accept=".jpg,.jpeg,.png"
+            aria-label="Upload image evidence" />
+
+        <!-- Webcam Capture -->
+        <div style="margin-top: 1rem;">
+          <button id="startWebcamBtn" type="button">📷 Start Webcam</button>
+          <button id="captureImageBtn" type="button" disabled>📸 Capture</button>
+          <video id="webcamPreview" autoplay playsinline style="max-width:100%; margin-top: 0.5rem; border-radius: 8px; display:none;"></video>
+        </div>
+
+          <!-- Drone Upload Option -->
+          <div class="drone-section">
+            <label>
+              <input type="checkbox" id="isDroneCheckbox" name="is_drone" />
+              🛰️ Image captured by drone
+            </label>
+            <input type="file" id="droneFileInput" accept="image/*" style="margin-top: 0.5rem; width: 100%;" />
+          </div>
+
+          <!-- Image Analysis Preview -->
+          <div class="image-analysis-preview" id="imageAnalysisPreview">
+            <h4>🔍 AI Image Analysis</h4>
+            <div id="imageAnalysisContent"></div>
+          </div>
+
+          <!-- Drone Image Analysis Preview -->
+          <div class="image-analysis-preview" id="droneImageAnalysisPreview">
+            <h4>🧠 Drone Image Analysis</h4>
+            <div id="droneImageAnalysisContent"></div>
+          </div>
+        </div>
+
+        <!-- Real-time AI Analysis Panel -->
+        <div class="realtime-analysis" id="realtimeAnalysis">
+          <div class="analysis-header">
+            <span>🧠 Real-time AI Analysis</span>
+            <div id="processingTime" style="margin-left: auto; font-size: 0.8rem; color: #6b7280;"></div>
+          </div>
+          
+          <div id="aiAnalysisContent">
+            <div style="margin-bottom: 1rem;">
+              <strong>Severity Assessment:</strong>
+              <span class="severity-indicator" id="severityIndicator">
+                <span id="severityText">Analyzing...</span>
+              </span>
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+              <strong>Text Analysis:</strong>
+              <span id="sentimentAnalysis">No text analysis yet</span>
+              <span class="panic-indicator" id="panicIndicator" style="display: none;"></span>
+            </div>
+            
+            <div class="ai-recommendations" id="aiRecommendations" style="display: none;">
+              <h4>💡 AI Recommendations</h4>
+              <ul id="recommendationsList"></ul>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" id="analyzeBtn" aria-label="Submit form for AI analysis">🔍 Analyze Situation</button>
+      </form>
+
+      <form id="pdfForm" method="post" action="/export-pdf">
+        <input type="hidden" name="report_text" id="hiddenReportText">
+        <button type="submit" class="analyze-button" style="margin-top: 1rem;">🖨️ Export as PDF</button>
+      </form>
+    </div>
+
+    {% if result %}
+    <div class="result-card" id="resultCard">
+      <h2>📊 AI Situation Assessment</h2>
+
+      {% if hazards %}
+        <div class="hazard-warnings" id="hazardSection">
+          <button id="toggleHazards" aria-expanded="true" style="background: none; border: none; font-weight: bold; font-size: 1rem; margin-bottom: 0.5rem; color: #991b1b;">
+            🔽 Detected Audio Hazards
+          </button>
+          <div id="hazardList">
+            <ul>
+              {% for h in hazards %}
+                <li>🚨 {{ h }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if result.error %}
+        <p><strong>Error:</strong> {{ result.error }}</p>
+      {% else %}
+        <p><strong>Type:</strong> {{ result.type|capitalize }}</p>
+        {% if result.type == 'image' %}
+          <p><strong>Detected:</strong> {{ result.damage_detected }}</p>
+          <p><strong>Confidence:</strong> {{ result.confidence * 100 }}%</p>
+          <p><strong>Suggested Action:</strong> {{ result.suggested_action }}</p>
+        {% elif result.type == 'text' %}
+          <p><strong>Response:</strong> {{ result.output }}</p>
+        {% endif %}
+      {% endif %}
+    </div>
+    <script>document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });</script>
+    {% endif %}
+
+    <!-- 🔗 Manual Mesh Pairing UI -->
+<div id="pairing-ui" style="margin-top: 2rem; padding: 1rem; background: #eef2ff; border: 1px solid #93c5fd; border-radius: 8px;">
+  <h3 style="margin-bottom: 0.5rem;">Manual Mesh Pairing (Offline Mode)</h3>
+  <canvas id="qr-code" style="display:block;margin:auto;"></canvas>
+  <pre id="signal-raw" style="background:#fff; padding:8px; font-size:0.8em; overflow-wrap:anywhere; border:1px dashed #ccc; margin-top:0.5rem;"></pre>
+  <input id="signal-input" placeholder="Paste peer signal here" style="width:100%; margin-top:0.5rem; padding:0.5rem; font-size:0.9em; border:1px solid #ccc; border-radius:4px;" />
+  <button onclick="handleManualSignal()" style="margin-top:0.5rem; padding:0.5rem 1rem; background:#3b82f6; color:white; border:none; border-radius:4px;">🔗 Connect Peer</button>
+</div>
+
+<script>
+function handleManualSignal() {
+  const val = document.getElementById('signal-input').value;
+  if (val) {
+    import('/static/js/p2p/fallback-webrtc.js').then(module => {
+      module.manualSignalInput(val);
+    });
+  }
+}
+</script>
+
+  </main>
+
+  <footer class="footer">
+    <p>🔒 Privacy-First | ⚙️ Works Offline | ⚡ AI-Powered</p>
+  </footer>
+
+  <!-- Load Edge AI Engine -->
+  <script src="/static/js/edge-ai.js"></script>
+
+  <script>
+    // Global variables for AI integration
+    let currentImageAnalysis = null;
+    let currentTextAnalysis = null;
+    let currentDroneAnalysis = null;
+    let analysisTimeout = null;
+
+    // Context selector management
+    const contextSelect = document.getElementById('contextSelect');
+    // Save context selection locally
+    contextSelect.addEventListener('change', () => {
+      localStorage.setItem('lastContext', contextSelect.value);
+    });
+    // Load context on page load if saved
+    window.addEventListener('load', () => {
+      const savedContext = localStorage.getItem('lastContext');
+      if (savedContext) {
+        contextSelect.value = savedContext;
+      }
+    });
+
+    // Theme toggle
+    const themeBtn = document.getElementById('toggleThemeBtn');
+    themeBtn.addEventListener('click', () => {
+      const html = document.documentElement;
+      const current = html.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+    });
+
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+
+    // High contrast toggle
+    const contrastBtn = document.getElementById("contrastToggleBtn");
+    contrastBtn.addEventListener("click", () => {
+      const html = document.documentElement;
+      const current = html.getAttribute('data-contrast');
+      const next = current === 'high' ? 'normal' : 'high';
+      html.setAttribute('data-contrast', next);
+      localStorage.setItem('contrast', next);
+    });
+
+    const savedContrast = localStorage.getItem('contrast');
+    if (savedContrast) document.documentElement.setAttribute('data-contrast', savedContrast);
+
+    // Edge AI Status Management
+    function updateAIStatus(status, message) {
+      const statusDot = document.getElementById('aiStatusDot');
+      const statusText = document.getElementById('aiStatusText');
+      
+      statusDot.className = `ai-status-dot ${status}`;
+      statusText.textContent = message;
+    }
+
+    // Listen for Edge AI ready event
+    window.addEventListener('edgeai-ready', (event) => {
+      updateAIStatus('ready', '🧠 Edge AI Ready - Privacy-first analysis active');
+      console.log('✅ Edge AI models loaded:', event.detail.models);
+    });
+
+    // Real-time Text Analysis
+    const reportTextArea = document.getElementById('report_text');
+    reportTextArea.addEventListener('input', (e) => {
+      const text = e.target.value.trim();
+      
+      // Clear previous timeout
+      if (analysisTimeout) {
+        clearTimeout(analysisTimeout);
+      }
+      
+      // Show processing indicator
+      const processingIndicator = document.getElementById('textProcessing');
+      if (text.length > 10) {
+        processingIndicator.classList.add('active');
+        
+        // Debounce analysis
+        analysisTimeout = setTimeout(async () => {
+          await performTextAnalysis(text);
+          processingIndicator.classList.remove('active');
+        }, 500);
+      } else {
+        processingIndicator.classList.remove('active');
+        hideRealtimeAnalysis();
+      }
+    });
+
+    async function performTextAnalysis(text) {
+      try {
+        const startTime = performance.now();
+        
+        // Perform sentiment analysis
+        currentTextAnalysis = window.EdgeAI.analyzeSentiment(text);
+        
+        // Calculate processing time
+        const processingTime = performance.now() - startTime;
+        
+        // Update UI with results
+        updateRealtimeAnalysis();
+        showProcessingTime(processingTime);
+        
+        console.log('📝 Text analysis complete:', currentTextAnalysis);
+      } catch (error) {
+        console.error('❌ Text analysis failed:', error);
+        updateAIStatus('error', '🧠 Text analysis unavailable');
+      }
+    }
+
+    // Image Upload Analysis
+    const fileInput = document.getElementById('file');
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (file && file.type.startsWith('image/')) {
+        await performImageAnalysis(file);
+      }
+    });
+
+    // Drone Image Upload Analysis
+    const droneInput = document.getElementById('droneFileInput');
+    const droneCheckbox = document.getElementById('isDroneCheckbox');
+    const dronePreview = document.getElementById('droneImageAnalysisPreview');
+    const droneContent = document.getElementById('droneImageAnalysisContent');
+
+    droneInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (file && file.type.startsWith('image/')) {
+        // Show spinner
+        droneContent.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div class="spinner"></div>
+            <span>Analyzing drone image...</span>
+          </div>
+        `;
+        dronePreview.classList.add('visible');
+        
+        const img = new Image();
+        img.onload = async () => {
+          try {
+            const context = document.getElementById('contextSelect').value;
+            const result = await window.EdgeAI.analyzeImage(img, { context });
+            currentDroneAnalysis = result;
+            
+            droneContent.innerHTML = `
+              <div style="margin-bottom: 0.5rem;">
+                <strong>🛰️ Aerial Analysis Complete</strong>
+                ${context ? `<span style="background: rgba(59, 130, 246, 0.1); color: #1e40af; padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem; margin-left: 0.5rem;">Context: ${context.replace('_', ' ')}</span>` : ''}
+              </div>
+              <p><strong>Hazards:</strong> ${result.hazards?.map(h => h.type).join(', ') || 'None detected'}</p>
+              <p><strong>Confidence:</strong> ${Math.round(result.confidence * 100)}%</p>
+              <p><strong>Objects:</strong> ${result.objects?.map(o => o.class).join(', ') || 'None detected'}</p>
+              <div style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(14, 165, 233, 0.1); border-radius: 4px; font-size: 0.8rem;">
+                <strong>📍 Drone Perspective Benefits:</strong> Enhanced coverage area, elevated hazard detection, improved situational awareness
+              </div>
+            `;
+            
+            // Update real-time analysis to include drone data
+            updateRealtimeAnalysis();
+            
+            console.log('🛰️ Drone image analysis complete:', result);
+          } catch (error) {
+            console.error('❌ Drone image analysis failed:', error);
+            droneContent.innerHTML = '<p style="color: #dc2626;">⚠️ Analysis failed. Please try again.</p>';
+          }
+        };
+        img.src = URL.createObjectURL(file);
+      }
+    });
+
+    // Webcam Capture Logic
+const startWebcamBtn = document.getElementById('startWebcamBtn');
+const captureImageBtn = document.getElementById('captureImageBtn');
+const webcamPreview = document.getElementById('webcamPreview');
+let webcamStream = null;
+
+startWebcamBtn.addEventListener('click', async () => {
+  try {
+    webcamStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    webcamPreview.srcObject = webcamStream;
+    webcamPreview.style.display = 'block';
+    captureImageBtn.disabled = false;
+    startWebcamBtn.textContent = '🔌 Stop Webcam';
+  } catch (err) {
+    console.error('❌ Webcam error:', err);
+    alert('Webcam not available or permission denied');
+  }
+});
+
+captureImageBtn.addEventListener('click', () => {
+  if (!webcamStream) return;
+
+  const canvas = document.createElement('canvas');
+  const video = webcamPreview;
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  canvas.toBlob(async blob => {
+    const file = new File([blob], 'webcam_capture.jpg', { type: 'image/jpeg' });
+    await performImageAnalysis(file);
+  }, 'image/jpeg');
+
+  // Optional: stop stream after capture
+  webcamStream.getTracks().forEach(t => t.stop());
+  webcamPreview.style.display = 'none';
+  captureImageBtn.disabled = true;
+  startWebcamBtn.textContent = '📷 Start Webcam';
+});
+
+    async function performImageAnalysis(file) {
+      try {
+        // Show loading state
+        showImageAnalysisLoading();
+        
+        // Create image element for analysis
+        const img = new Image();
+        img.onload = async () => {
+          const startTime = performance.now();
+          
+          // Get context for enhanced analysis
+          const context = document.getElementById('contextSelect').value;
+          
+          // Perform AI analysis with context
+          currentImageAnalysis = await window.EdgeAI.analyzeImage(img, { context });
+          
+          // Calculate processing time
+          const processingTime = performance.now() - startTime;
+          
+          // Update UI
+          updateImageAnalysisDisplay();
+          updateRealtimeAnalysis();
+          showProcessingTime(processingTime);
+          
+          console.log('📷 Image analysis complete:', currentImageAnalysis);
+        };
+        
+        img.src = URL.createObjectURL(file);
+      } catch (error) {
+        console.error('❌ Image analysis failed:', error);
+        hideImageAnalysis();
+      }
+    }
+
+    function showImageAnalysisLoading() {
+      const preview = document.getElementById('imageAnalysisPreview');
+      const content = document.getElementById('imageAnalysisContent');
+      
+      content.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <div class="spinner"></div>
+          <span>Analyzing image for hazards...</span>
+        </div>
+      `;
+      
+      preview.classList.add('visible');
+    }
+
+    function updateImageAnalysisDisplay() {
+      if (!currentImageAnalysis) return;
+      
+      const content = document.getElementById('imageAnalysisContent');
+      const analysis = currentImageAnalysis;
+      const context = document.getElementById('contextSelect').value;
+      
+      let hazardTags = '';
+      if (analysis.hazards && analysis.hazards.length > 0) {
+        hazardTags = analysis.hazards.map(hazard => 
+          `<span class="hazard-tag">${hazard.type.replace('_', ' ')} (${hazard.confidence}%)</span>`
+        ).join('');
+      }
+      
+      let objectTags = '';
+      if (analysis.objects && analysis.objects.length > 0) {
+        objectTags = analysis.objects.map(obj => 
+          `<span style="background: #3b82f6; color: white; padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem; margin-right: 0.5rem;">${obj.class} (${obj.confidence}%)</span>`
+        ).join('');
+      }
+      
+      content.innerHTML = `
+        <div style="margin-bottom: 0.5rem;">
+          <strong>Confidence:</strong> ${Math.round(analysis.confidence * 100)}%
+          ${context ? `<span style="background: rgba(59, 130, 246, 0.1); color: #1e40af; padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem; margin-left: 0.5rem;">Context: ${context.replace('_', ' ')}</span>` : ''}
+          <div class="confidence-bar">
+            <div class="confidence-fill" style="width: ${analysis.confidence * 100}%"></div>
+          </div>
+        </div>
+        
+        ${analysis.hazards && analysis.hazards.length > 0 ? `
+          <div style="margin-bottom: 0.5rem;">
+            <strong>🚨 Detected Hazards:</strong>
+            <div class="hazard-tags">${hazardTags}</div>
+          </div>
+        ` : ''}
+        
+        ${analysis.objects && analysis.objects.length > 0 ? `
+          <div style="margin-bottom: 0.5rem;">
+            <strong>🎯 Detected Objects:</strong>
+            <div style="margin-top: 0.5rem;">${objectTags}</div>
+          </div>
+        ` : ''}
+        
+        <div style="font-size: 0.85rem; color: #6b7280;">
+          Severity: ${analysis.severity}/10 | Processing: Client-side AI
+        </div>
+      `;
+    }
+
+    function updateRealtimeAnalysis() {
+      const panel = document.getElementById('realtimeAnalysis');
+      const severityIndicator = document.getElementById('severityIndicator');
+      const severityText = document.getElementById('severityText');
+      const sentimentAnalysis = document.getElementById('sentimentAnalysis');
+      const panicIndicator = document.getElementById('panicIndicator');
+      const recommendations = document.getElementById('aiRecommendations');
+      const recommendationsList = document.getElementById('recommendationsList');
+      
+      // Calculate comprehensive severity including drone data
+      let overallSeverity = 1;
+      let severityClass = 'severity-low';
+      let allRecommendations = [];
+      
+      if (currentImageAnalysis || currentTextAnalysis || currentDroneAnalysis) {
+        const severity = window.EdgeAI.calculateSeverity(
+          currentImageAnalysis,
+          currentTextAnalysis,
+          { droneAnalysis: currentDroneAnalysis }
+        );
+        
+        overallSeverity = Math.round(severity.overall);
+        
+        // Drone data can increase severity due to wider coverage
+        if (currentDroneAnalysis && currentDroneAnalysis.hazards?.length > 0) {
+          overallSeverity = Math.min(10, overallSeverity + 1);
+        }
+        
+        // Set severity class
+        if (overallSeverity >= 8) severityClass = 'severity-critical';
+        else if (overallSeverity >= 6) severityClass = 'severity-high';
+        else if (overallSeverity >= 3) severityClass = 'severity-medium';
+        
+        // Generate recommendations including drone-specific ones
+        allRecommendations = window.EdgeAI.generateRecommendations({
+          imageAnalysis: currentImageAnalysis,
+          textAnalysis: currentTextAnalysis,
+          droneAnalysis: currentDroneAnalysis,
+          severity: severity
+        });
+        
+        // Add drone-specific recommendations
+        if (currentDroneAnalysis) {
+          allRecommendations.unshift({
+            priority: 'high',
+            action: 'Drone imagery provides elevated perspective - consider expanding search area based on aerial view',
+            reason: 'Aerial surveillance advantage'
+          });
+        }
+
+        // Add context-specific recommendations
+        const context = document.getElementById('contextSelect').value;
+        if (context) {
+          const contextRecommendations = getContextSpecificRecommendations(context, overallSeverity);
+          allRecommendations = [...contextRecommendations, ...allRecommendations];
+        }
+      }
+      
+      // Update severity display
+      severityIndicator.className = `severity-indicator ${severityClass}`;
+      severityText.textContent = `${overallSeverity}/10`;
+      
+      // Update text analysis display
+      if (currentTextAnalysis) {
+        sentimentAnalysis.textContent = `Panic Level: ${currentTextAnalysis.panic_level}`;
+        
+        // Show panic indicator
+        const panicClass = `panic-${currentTextAnalysis.panic_level}`;
+        panicIndicator.className = `panic-indicator ${panicClass}`;
+        panicIndicator.textContent = currentTextAnalysis.panic_level.toUpperCase();
+        panicIndicator.style.display = 'inline';
+        
+        // Add emergency indicators to recommendations
+        if (currentTextAnalysis.emergency_indicators.length > 0) {
+          currentTextAnalysis.emergency_indicators.forEach(indicator => {
+            allRecommendations.unshift({
+              priority: 'immediate',
+              action: `Keyword detected: "${indicator.keyword}" - ${indicator.category} level alert`,
+              reason: 'Emergency language analysis'
+            });
+          });
+        }
+      } else {
+        sentimentAnalysis.textContent = 'Enter text for analysis';
+        panicIndicator.style.display = 'none';
+      }
+      
+      // Update recommendations
+      if (allRecommendations.length > 0) {
+        recommendationsList.innerHTML = allRecommendations.map(rec => 
+          `<li><strong>${rec.priority}:</strong> ${rec.action}</li>`
+        ).join('');
+        recommendations.style.display = 'block';
+      } else {
+        recommendations.style.display = 'none';
+      }
+      
+      // Show the panel
+      panel.classList.add('visible');
+    }
+
+    function getContextSpecificRecommendations(context, severity) {
+      const recommendations = [];
+      
+      switch(context) {
+        case 'urban_fire':
+          recommendations.push({
+            priority: 'immediate',
+            action: 'Evacuate immediately if in fire zone. Check for smoke inhalation risks.',
+            reason: 'Urban fire context'
+          });
+          break;
+        case 'flooding':
+          recommendations.push({
+            priority: 'high',
+            action: 'Move to higher ground. Avoid walking/driving through flood water.',
+            reason: 'Flooding context'
+          });
+          break;
+        case 'earthquake':
+          recommendations.push({
+            priority: 'immediate',
+            action: 'Drop, cover, and hold on. Check for structural damage and aftershocks.',
+            reason: 'Earthquake context'
+          });
+          break;
+        case 'chemical_spill':
+          recommendations.push({
+            priority: 'critical',
+            action: 'Evacuate upwind from spill. Seek immediate medical attention if exposed.',
+            reason: 'Chemical spill context'
+          });
+          break;
+        case 'storm_damage':
+          recommendations.push({
+            priority: 'high',
+            action: 'Avoid downed power lines. Check for structural damage and debris.',
+            reason: 'Storm damage context'
+          });
+          break;
+      }
+      
+      return recommendations;
+    }
+
+    function hideRealtimeAnalysis() {
+      const panel = document.getElementById('realtimeAnalysis');
+      panel.classList.remove('visible');
+      currentTextAnalysis = null;
+    }
+
+    function hideImageAnalysis() {
+      const preview = document.getElementById('imageAnalysisPreview');
+      preview.classList.remove('visible');
+      currentImageAnalysis = null;
+    }
+
+    function showProcessingTime(time) {
+      const processingTimeEl = document.getElementById('processingTime');
+      processingTimeEl.textContent = `⚡ ${time.toFixed(1)}ms`;
+    }
+
+    // Voice recording logic
+    const recordBtn = document.getElementById('recordBtn');
+    const recordStatus = document.getElementById('recordStatus');
+    const audioUpload = document.getElementById('audioUpload');
+    const playback = document.getElementById('playback');
+    let mediaRecorder;
+    let audioChunks = [];
+
+    recordBtn.addEventListener('click', async () => {
+      if (recordBtn.textContent.includes("Stop")) {
+        mediaRecorder.stop();
+        recordBtn.textContent = "🎤 Start Recording";
+        recordStatus.textContent = "Processing...";
+      } else {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(audioChunks, { type: 'audio/webm' });
+          const file = new File([blob], "voice_input.webm", { type: 'audio/webm' });
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          audioUpload.files = dt.files;
+
+          playback.src = URL.createObjectURL(blob);
+          playback.style.display = 'block';
+          recordStatus.textContent = "Recorded";
+        };
+
+        mediaRecorder.start();
+        recordBtn.textContent = "⏹ Stop Recording";
+        recordStatus.textContent = "Recording...";
+      }
+    });
+
+    // Connection status
+    function updateConnectionStatus() {
+      const indicator = document.querySelector('.status-indicator');
+      if (navigator.onLine) {
+        indicator.innerHTML = '<div class="status-dot"></div>Online + Offline Ready';
+        indicator.className = 'status-indicator status-online';
+      } else {
+        indicator.innerHTML = '<div class="status-dot"></div>Offline Mode Active';
+        indicator.className = 'status-indicator status-offline';
+      }
+    }
+
+    window.addEventListener('online', updateConnectionStatus);
+    window.addEventListener('offline', updateConnectionStatus);
+    updateConnectionStatus();
+
+    // Export PDF content transfer
+    document.getElementById("pdfForm").addEventListener("submit", function(e) {
+      document.getElementById("hiddenReportText").value = document.getElementById("report_text").value;
+    });
+
+    // Collapsible hazard list
+    const toggleHazards = document.getElementById("toggleHazards");
+    const hazardList = document.getElementById("hazardList");
+    if (toggleHazards && hazardList) {
+      toggleHazards.addEventListener("click", () => {
+        const isVisible = hazardList.style.display !== "none";
+        hazardList.style.display = isVisible ? "none" : "block";
+        toggleHazards.setAttribute("aria-expanded", !isVisible);
+        toggleHazards.textContent = isVisible
+          ? "▶️ Show Detected Audio Hazards"
+          : "🔽 Detected Audio Hazards";
+      });
+    }
+
+    // Initialize AI status
+    updateAIStatus('loading', '🧠 Loading Edge AI models...');
+    
+    // Test Edge AI after a delay
+    setTimeout(() => {
+      if (window.EdgeAI && window.EdgeAI.isLoaded) {
+        console.log('🧪 Running Edge AI diagnostics...');
+        window.EdgeAI.runDiagnostics();
+      }
+    }, 3000);
+  </script>
+
+  <script>
+    // Map setup
+    const map = L.map('reportMap').setView([37.7749, -122.4194], 10); // Default to SF
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '🗺️ OpenStreetMap',
+      maxZoom: 19,
+    }).addTo(map);
+    let marker = null;
+    map.on('click', function(e) {
+      const { lat, lng } = e.latlng;
+      if (marker) {
+        marker.setLatLng(e.latlng);
+      } else {
+        marker = L.marker(e.latlng).addTo(map);
+      }
+      // Update hidden form fields
+      document.getElementById('latitude').value = lat.toFixed(6);
+      document.getElementById('longitude').value = lng.toFixed(6);
+    });
+  </script>
+
+  <script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((reg) => console.log("✅ Service worker registered:", reg.scope))
+      .catch((err) => console.error("❌ Service worker registration failed:", err));
+    }
+  </script>
+
+<script>
+  // Sync Queue logic
+  function showSyncQueue() {
+    const queue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
+    const list = document.getElementById('syncQueueList');
+    const card = document.getElementById('syncQueueCard');
+
+    if (queue.length > 0) {
+      list.innerHTML = queue.map((r, i) => `
+        <li>📥 Report #${i + 1} — "${r.message?.slice(0, 40) || 'No text'}..." (${r.priority || 'N/A'})</li>
+      `).join('');
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  }
+
+  document.getElementById('syncNowBtn').addEventListener('click', async () => {
+    const queue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
+    for (const report of queue) {
+      try {
+        const res = await fetch('/api/submit-crowd-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(report),
+        });
+
+        if (res.ok) {
+          console.log('✅ Synced:', report);
+        } else {
+          throw new Error('Failed to sync');
+        }
+      } catch (err) {
+        console.error('❌ Sync failed:', err);
+        break;
+      }
+    }
+
+    localStorage.removeItem('syncQueue');
+    showSyncQueue();
+  });
+
+  window.addEventListener('online', showSyncQueue);
+  window.addEventListener('load', showSyncQueue);
+</script>
+
+<script type="module">
+  import { manualSignalOffer } from '/static/js/p2p/fallback-webrtc.js';
+  manualSignalOffer(); // Run on page load to generate QR
+</script>
+</body>
+</html>
+
+

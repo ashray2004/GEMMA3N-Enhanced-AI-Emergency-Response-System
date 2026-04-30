@@ -1,0 +1,573 @@
+{% extends "base.html" %}
+
+{% block title %}Emergency Report Generator - Disaster Response{% endblock %}
+
+{% block page_title %}📋 Emergency Report Generator{% endblock %}
+
+{% block subtitle %}Interactive PDF Report Creation Tool{% endblock %}
+
+{% block header_actions %}
+<a href="/" style="display: inline-block; margin-top: 1rem; padding: 0.5rem 1rem; background-color: #6b7280; color: #fff; border-radius: 6px; text-decoration: none; margin-right: 0.5rem;">
+  ⬅ Back to Dashboard
+</a>
+<a href="/live-generate" style="display: inline-block; margin-top: 1rem; padding: 0.5rem 1rem; background-color: #8b5cf6; color: #fff; border-radius: 6px; text-decoration: none;">
+  🧩 Advanced Editor
+</a>
+{% endblock %}
+
+{% block extra_css %}
+{{ super() }}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+      integrity="sha384-sA+rk4kJv1m9NBN7ZTQuNjvmZVcoESNkT0UX8sn7msodMbcTF2zX7HnqMQ7+AjzE" 
+      crossorigin="" />
+{% endblock %}
+
+{% block ai_status %}
+<!-- Don't show AI status on report generator -->
+{% endblock %}
+
+{% block sync_queue %}
+<!-- Don't show sync queue on report generator -->
+{% endblock %}
+
+{% block mesh_pairing %}
+<!-- Don't show P2P on report generator -->
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+  .generator-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+
+  .generator-header {
+    background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .generator-stats {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+  }
+
+  .stat-item {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+  }
+
+  .form-section {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .form-section h3 {
+    margin: 0 0 1rem 0;
+    color: #374151;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .input-group {
+    margin-bottom: 1rem;
+  }
+
+  .input-group label {
+    display: block;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .input-group input,
+  .input-group textarea,
+  .input-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .input-group input:focus,
+  .input-group textarea:focus,
+  .input-group select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .checklist-builder {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .checklist-input {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .checklist-input input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+  }
+
+  .add-task-btn {
+    background: #16a34a;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+  }
+
+  .add-task-btn:hover {
+    background: #15803d;
+  }
+
+  .checklist-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .checklist-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: white;
+    padding: 0.5rem;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+  }
+
+  .checklist-item span {
+    flex: 1;
+  }
+
+  .remove-item-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+
+  .remove-item-btn:hover {
+    background: #dc2626;
+  }
+
+  .map-container {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .map-container h3 {
+    margin: 0 0 1rem 0;
+    color: #374151;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  #map {
+    height: 300px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+  }
+
+  .map-controls {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .map-control-btn {
+    background: #6b7280;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+  }
+
+  .map-control-btn:hover {
+    background: #4b5563;
+  }
+
+  .preview-section {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .preview-section h3 {
+    margin: 0 0 1rem 0;
+    color: #374151;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .preview-content {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .preview-field {
+    margin-bottom: 0.75rem;
+    display: flex;
+    gap: 1rem;
+  }
+
+  .preview-label {
+    font-weight: 600;
+    color: #374151;
+    min-width: 120px;
+  }
+
+  .preview-value {
+    flex: 1;
+    color: #6b7280;
+  }
+
+  .preview-checklist {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .preview-checklist ul {
+    margin: 0;
+    padding-left: 1.5rem;
+  }
+
+  .preview-checklist li {
+    margin-bottom: 0.25rem;
+    color: #374151;
+  }
+
+  .preview-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin-top: 0.5rem;
+  }
+
+  .generate-btn {
+    background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+    width: 100%;
+  }
+
+  .generate-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+
+  .generate-btn:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .status-indicator {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding: 0.75rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+
+  .status-indicator.success {
+    display: flex;
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+  }
+
+  .status-indicator.error {
+    display: flex;
+    background: #fecaca;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+  }
+
+  .status-indicator.loading {
+    display: flex;
+    background: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+  }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .quick-fill-section {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .quick-fill-section h4 {
+    margin: 0 0 0.75rem 0;
+    color: #0c4a6e;
+    font-size: 0.95rem;
+  }
+
+  .quick-fill-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .quick-fill-btn {
+    background: #0ea5e9;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background 0.2s;
+  }
+
+  .quick-fill-btn:hover {
+    background: #0284c7;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .generator-stats {
+      justify-content: center;
+    }
+
+    .map-controls,
+    .quick-fill-buttons {
+      justify-content: center;
+    }
+
+    .checklist-input {
+      flex-direction: column;
+    }
+
+    .generator-container {
+      padding: 0 0.5rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="generator-container">
+  <!-- Generator Header -->
+  <div class="generator-header">
+    <h2 style="margin: 0 0 0.5rem 0;">📋 Emergency Report Generator</h2>
+    <p style="margin: 0; opacity: 0.9;">Create professional incident reports with maps, checklists, and media</p>
+    <div class="generator-stats">
+      <div class="stat-item">📄 PDF Generation</div>
+      <div class="stat-item">🗺️ Interactive Maps</div>
+      <div class="stat-item">✅ Custom Checklists</div>
+      <div class="stat-item">📸 Media Support</div>
+    </div>
+  </div>
+
+  <!-- Quick Fill Section -->
+  <div class="quick-fill-section">
+    <h4>🚀 Quick Fill Templates</h4>
+    <div class="quick-fill-buttons">
+      <button class="quick-fill-btn" onclick="fillTemplate('fire')">🔥 Fire Incident</button>
+      <button class="quick-fill-btn" onclick="fillTemplate('flood')">🌊 Flood Event</button>
+      <button class="quick-fill-btn" onclick="fillTemplate('earthquake')">🌎 Earthquake</button>
+      <button class="quick-fill-btn" onclick="fillTemplate('accident')">🚗 Traffic Accident</button>
+      <button class="quick-fill-btn" onclick="fillTemplate('medical')">🚑 Medical Emergency</button>
+      <button class="quick-fill-btn" onclick="clearForm()">🗑️ Clear All</button>
+    </div>
+  </div>
+
+  <!-- Form Grid -->
+  <div class="form-grid">
+    <!-- Incident Details -->
+    <div class="form-section">
+      <h3>📍 Incident Details</h3>
+      
+      <div class="input-group">
+        <label for="location">Location</label>
+        <input type="text" id="location" placeholder="e.g., 123 Main St, Austin, TX" />
+      </div>
+
+      <div class="input-group">
+        <label for="severity">Severity Level (1-10)</label>
+        <input type="range" id="severity" min="1" max="10" value="5" 
+               oninput="document.getElementById('severityValue').textContent = this.value" />
+        <div style="text-align: center; margin-top: 0.5rem;">
+          <span id="severityValue" style="font-weight: bold; color: #dc2626;">5</span>/10
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label for="hazards">Hazards (comma separated)</label>
+        <input type="text" id="hazards" placeholder="fire, smoke, debris" />
+      </div>
+
+      <div class="input-group">
+        <label for="notes">Additional Notes</label>
+        <textarea id="notes" rows="4" placeholder="Describe the situation in detail..."></textarea>
+      </div>
+
+      <div class="input-group">
+        <label for="imageUrl">Image URL (optional)</label>
+        <input type="url" id="imageUrl" placeholder="https://example.com/image.jpg" />
+      </div>
+    </div>
+
+    <!-- Checklist Builder -->
+    <div class="form-section">
+      <h3>✅ Action Checklist</h3>
+      
+      <div class="checklist-builder">
+        <div class="checklist-input">
+          <input type="text" id="newTaskInput" placeholder="Add new action item..." />
+          <button class="add-task-btn" onclick="addChecklistItem()">➕ Add</button>
+        </div>
+        
+        <div id="checklistItems" class="checklist-items">
+          <!-- Dynamic checklist items will appear here -->
+        </div>
+      </div>
+
+      <div class="quick-fill-section">
+        <h4>📋 Common Actions</h4>
+        <div class="quick-fill-buttons">
+          <button class="quick-fill-btn" onclick="addQuickTask('Secure the area')">🔒 Secure Area</button>
+          <button class="quick-fill-btn" onclick="addQuickTask('Contact emergency services')">📞 Call 112</button>
+          <button class="quick-fill-btn" onclick="addQuickTask('Evacuate personnel')">🚶‍♂️ Evacuate</button>
+          <button class="quick-fill-btn" onclick="addQuickTask('Document damage')">📸 Document</button>
+          <button class="quick-fill-btn" onclick="addQuickTask('Clear debris')">🧹 Clear Debris</button>
+          <button class="quick-fill-btn" onclick="addQuickTask('Search for victims')">🔍 Search & Rescue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map Section -->
+  <div class="map-container">
+    <h3>🗺️ Location Map</h3>
+    <div id="map" aria-label="Incident Location Map"></div>
+    <div class="map-controls">
+      <button class="map-control-btn" onclick="getCurrentLocation()">📍 Use Current Location</button>
+      <button class="map-control-btn" onclick="searchLocation()">🔍 Search Location</button>
+      <button class="map-control-btn" onclick="resetMap()">🔄 Reset Map</button>
+    </div>
+  </div>
+
+  <!-- Preview Section -->
+  <div class="preview-section">
+    <h3>👀 Report Preview</h3>
+    <div id="preview" class="preview-content">
+      <!-- Dynamic preview content will appear here -->
+    </div>
+    
+    <div id="statusIndicator" class="status-indicator">
+      <div class="spinner"></div>
+      <span>Generating PDF report...</span>
+    </div>
+    
+    <button id="generateBtn" class="generate-btn" onclick="generatePDF()">
+      📄 Generate PDF Report
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block base_scripts %}
+{{ super() }}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+        integrity="sha384-o4Ehm7RAtWk1e5RP2EuZPoAG0TcBXf+nL3dNyf6OhIsZhfu6My6ZTDlVcnlfciMn" 
+        crossorigin=""></script>
+<script src="/static/js/report-generator.js"></script>
+{% endblock %}
+
+{% block scripts %}
+<!-- All JavaScript functionality is now handled by report-generator.js -->
+{% endblock %}
+
+

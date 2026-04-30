@@ -1,0 +1,2117 @@
+<!-- Enhanced Crisis Command Map Interface -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crisis Command Map - Live Incident & Resource Tracking</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
+            color: #1f2937;
+            overflow: hidden;
+        }
+
+        .command-interface {
+            height: 100vh;
+            display: grid;
+            grid-template-areas: 
+                "header header header"
+                "sidebar map-container details"
+                "timeline map-container details";
+            grid-template-columns: 320px 1fr 350px;
+            grid-template-rows: 80px 1fr 120px;
+            gap: 8px;
+            padding: 8px;
+        }
+
+        /* Header */
+        .command-header {
+            grid-area: header;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .status-indicators {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-badge.online { background: #16a34a; color: white; }
+        .status-badge.critical { background: #dc2626; color: white; }
+        .status-badge.warning { background: #f59e0b; color: white; }
+
+        /* Sidebar */
+        .command-sidebar {
+            grid-area: sidebar;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .sidebar-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .filter-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-section h4 {
+            margin-bottom: 0.5rem;
+            color: #374151;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filter-select, .filter-input {
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: white;
+        }
+
+        .filter-checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.8rem;
+        }
+
+        .layer-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .layer-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem;
+            background: #f8fafc;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .layer-toggle:hover {
+            background: #e2e8f0;
+        }
+
+        .layer-toggle.active {
+            background: #dbeafe;
+            border-left: 3px solid #3b82f6;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .btn-success { background: #16a34a; color: white; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-danger { background: #dc2626; color: white; }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Map Container */
+        .map-container {
+            grid-area: map-container;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .control-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            padding: 0.75rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(10px);
+        }
+
+        .control-row {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .control-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .mini-btn {
+            padding: 0.4rem 0.8rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        /* Details Panel */
+        .details-panel {
+            grid-area: details;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .details-header {
+            background: linear-gradient(135deg, #059669 0%, #16a34a 100%);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .details-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .incident-card {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid #3b82f6;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .incident-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .incident-card.critical { border-left-color: #dc2626; }
+        .incident-card.high { border-left-color: #f59e0b; }
+        .incident-card.moderate { border-left-color: #3b82f6; }
+        .incident-card.low { border-left-color: #16a34a; }
+
+        .incident-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .incident-title {
+            font-weight: bold;
+            color: #1f2937;
+            font-size: 0.9rem;
+        }
+
+        .incident-time {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+        .incident-meta {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .meta-badge {
+            padding: 0.125rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: white;
+        }
+
+        /* Timeline */
+        .timeline-container {
+            grid-area: timeline;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .timeline-slider {
+            width: 100%;
+            margin: 0.5rem 0;
+        }
+
+        .playback-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        /* Statistics Dashboard */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #1e40af;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #6b7280;
+            text-transform: uppercase;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .command-interface {
+                grid-template-areas: 
+                    "header header"
+                    "map-container details"
+                    "sidebar sidebar";
+                grid-template-columns: 1fr 300px;
+                grid-template-rows: 80px 1fr 200px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .command-interface {
+                grid-template-areas: 
+                    "header"
+                    "map-container"
+                    "sidebar"
+                    "details";
+                grid-template-columns: 1fr;
+                grid-template-rows: 80px 1fr 150px 200px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .pulsing {
+            animation: pulse 2s infinite;
+        }
+
+        /* Custom Scrollbars */
+        .sidebar-content::-webkit-scrollbar,
+        .details-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar-content::-webkit-scrollbar-track,
+        .details-content::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        .sidebar-content::-webkit-scrollbar-thumb,
+        .details-content::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 10000;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6b7280;
+        }
+
+        .close-btn:hover {
+            color: #dc2626;
+        }
+    </style>
+</head>
+<body>
+    <div class="command-interface">
+        <!-- Header -->
+        <header class="command-header">
+            <div class="header-title">
+                🗺️ Crisis Command Map
+                <span style="font-size: 1rem; font-weight: normal; color: #94a3b8;">Live Incident & Resource Tracking</span>
+            </div>
+            <div class="status-indicators">
+                <div class="status-badge online">
+                    🟢 System Online
+                </div>
+                <div class="status-badge critical">
+                    🚨 <span id="criticalCount">0</span> Critical
+                </div>
+                <div class="status-badge warning">
+                    ⚠️ <span id="activeCount">0</span> Active
+                </div>
+                <div style="color: #94a3b8; font-size: 0.9rem;">
+                    Last Update: <span id="lastUpdate">--:--</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Sidebar -->
+        <aside class="command-sidebar">
+            <div class="sidebar-header">
+                🎛️ Command Controls
+            </div>
+            <div class="sidebar-content">
+                <!-- Quick Stats -->
+                <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr); margin-bottom: 1.5rem;">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalIncidents">0</div>
+                        <div class="stat-label">Incidents</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="resourcesDeployed">0</div>
+                        <div class="stat-label">Resources</div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="filter-section">
+                    <h4>🔍 Incident Filters</h4>
+                    <div class="filter-group">
+                        <select id="statusFilter" class="filter-select">
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="pending">Pending</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="escalated">Escalated</option>
+                        </select>
+                        <select id="severityFilter" class="filter-select">
+                            <option value="">All Severity</option>
+                            <option value="critical">Critical</option>
+                            <option value="high">High</option>
+                            <option value="moderate">Moderate</option>
+                            <option value="low">Low</option>
+                        </select>
+                        <select id="typeFilter" class="filter-select">
+                            <option value="">All Types</option>
+                            <option value="medical">Medical Emergency</option>
+                            <option value="fire">Fire/Hazmat</option>
+                            <option value="security">Security</option>
+                            <option value="natural">Natural Disaster</option>
+                            <option value="infrastructure">Infrastructure</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Layer Controls -->
+                <div class="filter-section">
+                    <h4>🗺️ Map Layers</h4>
+                    <div class="layer-controls">
+                        <div class="layer-toggle active" data-layer="incidents">
+                            <span>🚨 Active Incidents</span>
+                            <input type="checkbox" checked>
+                        </div>
+                        <div class="layer-toggle" data-layer="resources">
+                            <span>🚑 Resources</span>
+                            <input type="checkbox">
+                        </div>
+                        <div class="layer-toggle" data-layer="hazards">
+                            <span>☢️ Hazard Zones</span>
+                            <input type="checkbox">
+                        </div>
+                        <div class="layer-toggle" data-layer="evacuation">
+                            <span>🚶 Evacuation Routes</span>
+                            <input type="checkbox">
+                        </div>
+                        <div class="layer-toggle" data-layer="heatmap">
+                            <span>🔥 Intensity Heatmap</span>
+                            <input type="checkbox">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="refreshData()">
+                        🔄 Refresh Data
+                    </button>
+                    <button class="btn btn-success" onclick="createIncident()">
+                        ➕ New Incident
+                    </button>
+                    <button class="btn btn-warning" onclick="bulkActions()">
+                        📋 Bulk Actions
+                    </button>
+                    <button class="btn btn-secondary" onclick="exportData()">
+                        📊 Export Report
+                    </button>
+                    <button class="btn btn-danger" onclick="emergencyProtocol()">
+                        🚨 Emergency Protocol
+                    </button>
+                </div>
+
+                <!-- Quick Navigation -->
+                <div class="filter-section" style="margin-top: 1.5rem;">
+                    <h4>🧭 Quick Navigation</h4>
+                    <div class="action-buttons">
+                        <button class="btn btn-secondary" onclick="window.location.href='crisis-command-center'">
+                            🏢 Command Center
+                        </button>
+                        <button class="btn btn-secondary" onclick="window.location.href='analytics-dashboard'">
+                            📈 Analytics
+                        </button>
+                        <button class="btn btn-secondary" onclick="window.location.href='triage-dashboard'">
+                            🏥 Triage
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Map Container -->
+        <main class="map-container">
+            <div id="map"></div>
+            
+            <!-- Map Controls -->
+            <div class="map-controls">
+                <div class="control-panel">
+                    <div class="control-row">
+                        <button class="mini-btn btn-primary" onclick="findMyLocation()">📍 My Location</button>
+                        <button class="mini-btn btn-secondary" onclick="measureDistance()">📏 Measure</button>
+                    </div>
+                    <div class="control-row">
+                        <button class="mini-btn btn-warning" onclick="drawZone()">✏️ Draw Zone</button>
+                        <button class="mini-btn btn-success" onclick="addWaypoint()">📌 Waypoint</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Details Panel -->
+        <aside class="details-panel">
+            <div class="details-header">
+                📋 Incident Details
+            </div>
+            <div class="details-content" id="detailsContent">
+                <div style="text-align: center; color: #6b7280; padding: 2rem;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🗺️</div>
+                    <p>Select an incident on the map to view details</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Timeline -->
+        <section class="timeline-container">
+            <div class="timeline-header">
+                <h3>⏱️ Timeline Control</h3>
+                <div class="playback-controls">
+                    <button class="mini-btn btn-secondary" onclick="playbackRewind()">⏪</button>
+                    <button class="mini-btn btn-primary" onclick="playbackPlay()" id="playBtn">▶️</button>
+                    <button class="mini-btn btn-secondary" onclick="playbackForward()">⏩</button>
+                    <button class="mini-btn btn-warning" onclick="resetTimeline()">🔄</button>
+                </div>
+            </div>
+            <input type="range" class="timeline-slider" id="timelineSlider" min="0" max="24" value="24" step="1">
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">
+                <span>24h ago</span>
+                <span id="currentTimeDisplay">Current Time</span>
+                <span>Now</span>
+            </div>
+        </section>
+    </div>
+
+    <!-- Incident Detail Modal -->
+    <div class="modal" id="incidentModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🚨 Incident Details</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="modalContent">
+                <!-- Dynamic content will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+    <script>
+        // Global Variables
+        let map, incidentLayer, resourceLayer, hazardLayer, heatmapLayer;
+        let currentIncidents = [];
+        let currentResources = [];
+        let playbackTimer = null;
+        let isPlaying = false;
+
+        // Initialize Map
+        function initializeMap() {
+            // Create map centered on crisis area
+            map = L.map('map').setView([26.8467, 80.9462], 12);
+
+            // Add base tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Initialize layers
+            incidentLayer = L.markerClusterGroup({
+                chunkedLoading: true,
+                maxClusterRadius: 50
+            });
+            
+            resourceLayer = L.layerGroup();
+            hazardLayer = L.layerGroup();
+            
+            // Add drawing controls
+            const drawControl = new L.Control.Draw({
+                position: 'topright',
+                draw: {
+                    polyline: true,
+                    polygon: true,
+                    circle: true,
+                    rectangle: true,
+                    marker: true
+                }
+            });
+            map.addControl(drawControl);
+
+            // Add layers to map
+            map.addLayer(incidentLayer);
+        }
+
+        // Generate Sample Data
+        function generateSampleData() {
+            const sampleIncidents = [
+                {
+                    id: 'INC-001',
+                    title: 'Structure Fire - Downtown',
+                    type: 'fire',
+                    severity: 'critical',
+                    status: 'active',
+                    lat: 26.8467,
+                    lng: 80.9462,
+                    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
+                    description: 'Major structure fire at commercial building. Multiple units responding.',
+                    assignedResources: ['Fire-01', 'Fire-02', 'EMS-03'],
+                    reporter: 'Fire Chief Martinez',
+                    affectedPersons: 15
+                },
+                {
+                    id: 'INC-002',
+                    title: 'Multi-Vehicle Accident',
+                    type: 'medical',
+                    severity: 'high',
+                    status: 'active',
+                    lat: 26.8367,
+                    lng: 80.9462,
+                    timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
+                    description: 'Three-car collision on I-25. Multiple injuries reported.',
+                    assignedResources: ['EMS-01', 'Police-02'],
+                    reporter: 'Traffic Control',
+                    affectedPersons: 6
+                },
+                {
+                    id: 'INC-003',
+                    title: 'Chemical Spill',
+                    type: 'hazmat',
+                    severity: 'critical',
+                    status: 'escalated',
+                    lat: 26.8567,
+                    lng: 80.9462,
+                    timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
+                    description: 'Chemical leak at industrial facility. Evacuation in progress.',
+                    assignedResources: ['HAZMAT-01', 'Fire-03', 'EMS-02'],
+                    reporter: 'Environmental Agency',
+                    affectedPersons: 50
+                },
+                {
+                    id: 'INC-004',
+                    title: 'Power Grid Failure',
+                    type: 'infrastructure',
+                    severity: 'moderate',
+                    status: 'pending',
+                    lat: 26.8267,
+                    lng: 80.9462,
+                    timestamp: new Date(Date.now() - 30 * 60 * 1000),
+                    description: 'Widespread power outage affecting 3 city blocks.',
+                    assignedResources: ['Utility-01'],
+                    reporter: 'Power Company',
+                    affectedPersons: 200
+                }
+            ];
+
+            const sampleResources = [
+                {
+                    id: 'Fire-01',
+                    type: 'Fire Engine',
+                    status: 'deployed',
+                    lat: 26.8467,
+                    lng: 80.9462,
+                    crew: 4,
+                    assignedTo: 'INC-001'
+                },
+                {
+                    id: 'EMS-01',
+                    type: 'Ambulance',
+                    status: 'deployed',
+                    lat: 26.8367,
+                    lng: 80.9462,
+                    crew: 2,
+                    assignedTo: 'INC-002'
+                },
+                {
+                    id: 'Police-01',
+                    type: 'Patrol Unit',
+                    status: 'available',
+                    lat: 26.8667,
+                    lng: 80.9462,
+                    crew: 2,
+                    assignedTo: null
+                }
+            ];
+
+            currentIncidents = sampleIncidents;
+            currentResources = sampleResources;
+        }
+
+        // Render Incidents
+        function renderIncidents() {
+            incidentLayer.clearLayers();
+            
+            currentIncidents.forEach(incident => {
+                const icon = getIncidentIcon(incident.severity, incident.type);
+                const marker = L.marker([incident.lat, incident.lng], { icon })
+                    .bindPopup(createIncidentPopup(incident))
+                    .on('click', () => showIncidentDetails(incident));
+                
+                incidentLayer.addLayer(marker);
+            });
+        }
+
+        // Get Incident Icon
+        function getIncidentIcon(severity, type) {
+            const colors = {
+                critical: '#dc2626',
+                high: '#f59e0b',
+                moderate: '#3b82f6',
+                low: '#16a34a'
+            };
+
+            const icons = {
+                fire: '🔥',
+                medical: '🚑',
+                hazmat: '☢️',
+                security: '🚔',
+                natural: '🌪️',
+                infrastructure: '⚡'
+            };
+
+            const color = colors[severity] || colors.low;
+            const emoji = icons[type] || '🚨';
+
+            return L.divIcon({
+                className: 'custom-incident-icon',
+                html: `
+                    <div style="
+                        background: ${color};
+                        border: 3px solid white;
+                        border-radius: 50%;
+                        width: 32px;
+                        height: 32px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 16px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                        animation: ${severity === 'critical' ? 'pulse 1.5s infinite' : 'none'};
+                    ">${emoji}</div>
+                `,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+        }
+
+        // Create Incident Popup
+        function createIncidentPopup(incident) {
+            const timeAgo = getTimeAgo(incident.timestamp);
+            return `
+                <div class="incident-popup" style="min-width: 250px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <strong style="color: #1f2937;">${incident.title}</strong>
+                        <span style="font-size: 0.75rem; color: #6b7280;">${timeAgo}</span>
+                    </div>
+                    <p style="margin: 0.5rem 0; color: #374151; font-size: 0.9rem;">${incident.description}</p>
+                    <div style="display: flex; gap: 0.5rem; margin: 0.5rem 0; flex-wrap: wrap;">
+                        <span style="background: ${getSeverityColor(incident.severity)}; color: white; padding: 0.125rem 0.5rem; border-radius: 12px; font-size: 0.7rem; font-weight: bold;">
+                            ${incident.severity.toUpperCase()}
+                        </span>
+                        <span style="background: #6b7280; color: white; padding: 0.125rem 0.5rem; border-radius: 12px; font-size: 0.7rem; font-weight: bold;">
+                            ${incident.status.toUpperCase()}
+                        </span>
+                        <span style="background: #3b82f6; color: white; padding: 0.125rem 0.5rem; border-radius: 12px; font-size: 0.7rem; font-weight: bold;">
+                            ${incident.affectedPersons} Affected
+                        </span>
+                    </div>
+                    <div style="margin-top: 0.75rem; text-align: center;">
+                        <button onclick="showIncidentDetails('${incident.id}')" style="background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                            📋 View Details
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Utility Functions
+        function getSeverityColor(severity) {
+            const colors = {
+                critical: '#dc2626',
+                high: '#f59e0b',
+                moderate: '#3b82f6',
+                low: '#16a34a'
+            };
+            return colors[severity] || colors.low;
+        }
+
+        function getTimeAgo(timestamp) {
+            const now = new Date();
+            const diff = now - timestamp;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+
+            if (days > 0) return `${days}d ago`;
+            if (hours > 0) return `${hours}h ago`;
+            if (minutes > 0) return `${minutes}m ago`;
+            return 'Just now';
+        }
+
+        // Show Incident Details
+        function showIncidentDetails(incidentId) {
+            const incident = currentIncidents.find(i => i.id === incidentId);
+            if (!incident) return;
+
+            const detailsHTML = `
+                <div class="incident-detail-card">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                        <div>
+                            <h3 style="margin: 0; color: #1f2937;">${incident.title}</h3>
+                            <p style="margin: 0.25rem 0; color: #6b7280; font-size: 0.9rem;">ID: ${incident.id}</p>
+                        </div>
+                        <span style="background: ${getSeverityColor(incident.severity)}; color: white; padding: 0.5rem 1rem; border-radius: 20px; font-weight: bold; font-size: 0.8rem;">
+                            ${incident.severity.toUpperCase()}
+                        </span>
+                    </div>
+
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                        <h4 style="margin: 0 0 0.5rem 0; color: #374151;">📍 Location & Time</h4>
+                        <p style="margin: 0.25rem 0;"><strong>Coordinates:</strong> ${incident.lat}, ${incident.lng}</p>
+                        <p style="margin: 0.25rem 0;"><strong>Reported:</strong> ${incident.timestamp.toLocaleString()}</p>
+                        <p style="margin: 0.25rem 0;"><strong>Reporter:</strong> ${incident.reporter}</p>
+                    </div>
+
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                        <h4 style="margin: 0 0 0.5rem 0; color: #374151;">📝 Description</h4>
+                        <p style="margin: 0; line-height: 1.5;">${incident.description}</p>
+                    </div>
+
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                        <h4 style="margin: 0 0 0.5rem 0; color: #374151;">👥 Impact Assessment</h4>
+                        <p style="margin: 0.25rem 0;"><strong>Affected Persons:</strong> ${incident.affectedPersons}</p>
+                        <p style="margin: 0.25rem 0;"><strong>Status:</strong> ${incident.status.toUpperCase()}</p>
+                        <p style="margin: 0.25rem 0;"><strong>Type:</strong> ${incident.type.toUpperCase()}</p>
+                    </div>
+
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                        <h4 style="margin: 0 0 0.5rem 0; color: #374151;">🚑 Assigned Resources</h4>
+                        ${incident.assignedResources.map(resource => `
+                            <span style="background: #16a34a; color: white; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.8rem; margin: 0.25rem 0.25rem 0.25rem 0; display: inline-block;">
+                                ${resource}
+                            </span>
+                        `).join('')}
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1.5rem;">
+                        <button onclick="assignResources('${incident.id}')" style="background: #16a34a; color: white; border: none; padding: 0.75rem 1rem; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1;">
+                            🚑 Assign Resources
+                        </button>
+                        <button onclick="escalateIncident('${incident.id}')" style="background: #f59e0b; color: white; border: none; padding: 0.75rem 1rem; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1;">
+                            ⚡ Escalate
+                        </button>
+                        <button onclick="updateStatus('${incident.id}')" style="background: #3b82f6; color: white; border: none; padding: 0.75rem 1rem; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1;">
+                            📝 Update Status
+                        </button>
+                        <button onclick="centerMapOnIncident('${incident.id}')" style="background: #6b7280; color: white; border: none; padding: 0.75rem 1rem; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1;">
+                            🎯 Center Map
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('detailsContent').innerHTML = detailsHTML;
+        }
+
+        // Render Resources
+        function renderResources() {
+            resourceLayer.clearLayers();
+            
+            currentResources.forEach(resource => {
+                const icon = getResourceIcon(resource.type, resource.status);
+                const marker = L.marker([resource.lat, resource.lng], { icon })
+                    .bindPopup(createResourcePopup(resource));
+                
+                resourceLayer.addLayer(marker);
+            });
+        }
+
+        // Get Resource Icon
+        function getResourceIcon(type, status) {
+            const icons = {
+                'Fire Engine': '🚒',
+                'Ambulance': '🚑',
+                'Patrol Unit': '🚔',
+                'HAZMAT': '☢️',
+                'Utility': '⚡'
+            };
+
+            const colors = {
+                available: '#16a34a',
+                deployed: '#f59e0b',
+                maintenance: '#6b7280',
+                emergency: '#dc2626'
+            };
+
+            const emoji = icons[type] || '🚐';
+            const color = colors[status] || colors.available;
+
+            return L.divIcon({
+                className: 'custom-resource-icon',
+                html: `
+                    <div style="
+                        background: ${color};
+                        border: 2px solid white;
+                        border-radius: 50%;
+                        width: 28px;
+                        height: 28px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 14px;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                    ">${emoji}</div>
+                `,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+            });
+        }
+
+        // Create Resource Popup
+        function createResourcePopup(resource) {
+            return `
+                <div style="min-width: 200px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <strong>${resource.id}</strong>
+                        <span style="background: ${resource.status === 'available' ? '#16a34a' : '#f59e0b'}; color: white; padding: 0.125rem 0.5rem; border-radius: 12px; font-size: 0.7rem; font-weight: bold;">
+                            ${resource.status.toUpperCase()}
+                        </span>
+                    </div>
+                    <p style="margin: 0.25rem 0;"><strong>Type:</strong> ${resource.type}</p>
+                    <p style="margin: 0.25rem 0;"><strong>Crew:</strong> ${resource.crew} members</p>
+                    ${resource.assignedTo ? `<p style="margin: 0.25rem 0;"><strong>Assigned to:</strong> ${resource.assignedTo}</p>` : ''}
+                    <div style="margin-top: 0.75rem; text-align: center;">
+                        <button onclick="manageResource('${resource.id}')" style="background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                            ⚙️ Manage
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Update Statistics
+        function updateStatistics() {
+            const totalIncidents = currentIncidents.length;
+            const criticalCount = currentIncidents.filter(i => i.severity === 'critical').length;
+            const activeCount = currentIncidents.filter(i => i.status === 'active').length;
+            const resourcesDeployed = currentResources.filter(r => r.status === 'deployed').length;
+
+            document.getElementById('totalIncidents').textContent = totalIncidents;
+            document.getElementById('criticalCount').textContent = criticalCount;
+            document.getElementById('activeCount').textContent = activeCount;
+            document.getElementById('resourcesDeployed').textContent = resourcesDeployed;
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+        }
+
+        // Action Functions
+        function refreshData() {
+            console.log('🔄 Refreshing data...');
+            // Simulate data refresh
+            generateSampleData();
+            renderIncidents();
+            if (document.querySelector('.layer-toggle[data-layer="resources"] input').checked) {
+                renderResources();
+            }
+            updateStatistics();
+            
+            // Show notification
+            showNotification('Data refreshed successfully', 'success');
+        }
+
+        function createIncident() {
+            showModal('Create New Incident', `
+                <form onsubmit="submitNewIncident(event)" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <label style="display: block; margin-bottom: 0.25rem; font-weight: bold;">Title:</label>
+                        <input type="text" id="newIncidentTitle" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 0.25rem; font-weight: bold;">Type:</label>
+                        <select id="newIncidentType" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <option value="medical">Medical Emergency</option>
+                            <option value="fire">Fire/Hazmat</option>
+                            <option value="security">Security</option>
+                            <option value="natural">Natural Disaster</option>
+                            <option value="infrastructure">Infrastructure</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 0.25rem; font-weight: bold;">Severity:</label>
+                        <select id="newIncidentSeverity" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <option value="low">Low</option>
+                            <option value="moderate">Moderate</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 0.25rem; font-weight: bold;">Description:</label>
+                        <textarea id="newIncidentDescription" rows="3" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; resize: vertical;"></textarea>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label style="display: block; margin-bottom: 0.25rem; font-weight: bold;">Latitude:</label>
+                            <input type="number" id="newIncidentLat" step="any" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 0.25rem; font-weight: bold;">Longitude:</label>
+                            <input type="number" id="newIncidentLng" step="any" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                        </div>
+                    </div>
+                    <button type="submit" style="background: #16a34a; color: white; border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                        ✅ Create Incident
+                    </button>
+                </form>
+            `);
+        }
+
+        function submitNewIncident(event) {
+            event.preventDefault();
+            
+            const newIncident = {
+                id: 'INC-' + (currentIncidents.length + 1).toString().padStart(3, '0'),
+                title: document.getElementById('newIncidentTitle').value,
+                type: document.getElementById('newIncidentType').value,
+                severity: document.getElementById('newIncidentSeverity').value,
+                status: 'active',
+                lat: parseFloat(document.getElementById('newIncidentLat').value),
+                lng: parseFloat(document.getElementById('newIncidentLng').value),
+                timestamp: new Date(),
+                description: document.getElementById('newIncidentDescription').value,
+                assignedResources: [],
+                reporter: 'Command Center',
+                affectedPersons: 0
+            };
+
+            currentIncidents.push(newIncident);
+            renderIncidents();
+            updateStatistics();
+            closeModal();
+            showNotification('New incident created successfully', 'success');
+        }
+
+        function bulkActions() {
+            showModal('Bulk Actions', `
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <h3>Select Action:</h3>
+                    <button onclick="exportAllIncidents()" style="background: #3b82f6; color: white; border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                        📊 Export All Incidents
+                    </button>
+                    <button onclick="markAllResolved()" style="background: #16a34a; color: white; border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                        ✅ Mark All Low Priority as Resolved
+                    </button>
+                    <button onclick="generateReport()" style="background: #f59e0b; color: white; border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                        📋 Generate Situation Report
+                    </button>
+                    <button onclick="clearResolvedIncidents()" style="background: #dc2626; color: white; border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                        🗑️ Clear Resolved Incidents
+                    </button>
+                </div>
+            `);
+        }
+
+        function exportData() {
+            const dataToExport = {
+                timestamp: new Date().toISOString(),
+                incidents: currentIncidents,
+                resources: currentResources,
+                summary: {
+                    totalIncidents: currentIncidents.length,
+                    criticalIncidents: currentIncidents.filter(i => i.severity === 'critical').length,
+                    activeIncidents: currentIncidents.filter(i => i.status === 'active').length,
+                    deployedResources: currentResources.filter(r => r.status === 'deployed').length
+                }
+            };
+
+            const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `crisis-report-${new Date().toISOString().slice(0, 19)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showNotification('Report exported successfully', 'success');
+        }
+
+        function emergencyProtocol() {
+            showModal('🚨 Emergency Protocol Activation', `
+                <div style="text-align: center; color: #dc2626;">
+                    <div style="font-size: 4rem; margin-bottom: 1rem;">🚨</div>
+                    <h2 style="color: #dc2626; margin-bottom: 1rem;">EMERGENCY PROTOCOL</h2>
+                    <p style="margin-bottom: 2rem; font-size: 1.1rem;">This will activate emergency protocols and notify all relevant personnel.</p>
+                    <div style="display: flex; gap: 1rem; justify-content: center;">
+                        <button onclick="activateEmergencyProtocol()" style="background: #dc2626; color: white; border: none; padding: 1rem 2rem; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1.1rem;">
+                            🚨 ACTIVATE EMERGENCY
+                        </button>
+                        <button onclick="closeModal()" style="background: #6b7280; color: white; border: none; padding: 1rem 2rem; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1.1rem;">
+                            ❌ Cancel
+                        </button>
+                    </div>
+                </div>
+            `);
+        }
+
+        // Timeline Functions
+        function playbackPlay() {
+            const playBtn = document.getElementById('playBtn');
+            
+            if (isPlaying) {
+                // Pause
+                clearInterval(playbackTimer);
+                isPlaying = false;
+                playBtn.textContent = '▶️';
+            } else {
+                // Play
+                isPlaying = true;
+                playBtn.textContent = '⏸️';
+                playbackTimer = setInterval(() => {
+                    const slider = document.getElementById('timelineSlider');
+                    let currentValue = parseInt(slider.value);
+                    
+                    if (currentValue < parseInt(slider.max)) {
+                        slider.value = currentValue + 1;
+                        updateTimelineDisplay();
+                        filterIncidentsByTime();
+                    } else {
+                        // End of timeline
+                        clearInterval(playbackTimer);
+                        isPlaying = false;
+                        playBtn.textContent = '▶️';
+                    }
+                }, 1000);
+            }
+        }
+
+        function playbackRewind() {
+            const slider = document.getElementById('timelineSlider');
+            slider.value = Math.max(0, parseInt(slider.value) - 1);
+            updateTimelineDisplay();
+            filterIncidentsByTime();
+        }
+
+        function playbackForward() {
+            const slider = document.getElementById('timelineSlider');
+            slider.value = Math.min(parseInt(slider.max), parseInt(slider.value) + 1);
+            updateTimelineDisplay();
+            filterIncidentsByTime();
+        }
+
+        function resetTimeline() {
+            const slider = document.getElementById('timelineSlider');
+            slider.value = slider.max;
+            updateTimelineDisplay();
+            filterIncidentsByTime();
+            
+            if (isPlaying) {
+                clearInterval(playbackTimer);
+                isPlaying = false;
+                document.getElementById('playBtn').textContent = '▶️';
+            }
+        }
+
+        function updateTimelineDisplay() {
+            const slider = document.getElementById('timelineSlider');
+            const value = parseInt(slider.value);
+            const hoursAgo = parseInt(slider.max) - value;
+            
+            let displayText;
+            if (hoursAgo === 0) {
+                displayText = 'Current Time';
+            } else if (hoursAgo === 1) {
+                displayText = '1 hour ago';
+            } else {
+                displayText = `${hoursAgo} hours ago`;
+            }
+            
+            document.getElementById('currentTimeDisplay').textContent = displayText;
+        }
+
+        function filterIncidentsByTime() {
+            const slider = document.getElementById('timelineSlider');
+            const value = parseInt(slider.value);
+            const hoursAgo = parseInt(slider.max) - value;
+            const cutoffTime = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+            
+            incidentLayer.clearLayers();
+            
+            const filteredIncidents = currentIncidents.filter(incident => 
+                incident.timestamp >= cutoffTime
+            );
+            
+            filteredIncidents.forEach(incident => {
+                const icon = getIncidentIcon(incident.severity, incident.type);
+                const marker = L.marker([incident.lat, incident.lng], { icon })
+                    .bindPopup(createIncidentPopup(incident))
+                    .on('click', () => showIncidentDetails(incident));
+                
+                incidentLayer.addLayer(marker);
+            });
+        }
+
+        // Layer Toggle Functions
+        function setupLayerToggles() {
+            document.querySelectorAll('.layer-toggle').forEach(toggle => {
+                toggle.addEventListener('click', function() {
+                    const checkbox = this.querySelector('input');
+                    const layer = this.dataset.layer;
+                    
+                    checkbox.checked = !checkbox.checked;
+                    this.classList.toggle('active', checkbox.checked);
+                    
+                    toggleLayer(layer, checkbox.checked);
+                });
+            });
+        }
+
+        function toggleLayer(layerName, show) {
+            switch(layerName) {
+                case 'incidents':
+                    if (show) {
+                        map.addLayer(incidentLayer);
+                    } else {
+                        map.removeLayer(incidentLayer);
+                    }
+                    break;
+                case 'resources':
+                    if (show) {
+                        renderResources();
+                        map.addLayer(resourceLayer);
+                    } else {
+                        map.removeLayer(resourceLayer);
+                    }
+                    break;
+                case 'heatmap':
+                    if (show) {
+                        createHeatmap();
+                    } else if (heatmapLayer) {
+                        map.removeLayer(heatmapLayer);
+                    }
+                    break;
+                case 'hazards':
+                    if (show) {
+                        createHazardZones();
+                        map.addLayer(hazardLayer);
+                    } else {
+                        map.removeLayer(hazardLayer);
+                    }
+                    break;
+            }
+        }
+
+        function createHeatmap() {
+            const heatData = currentIncidents.map(incident => {
+                let weight = 0.5;
+                switch(incident.severity) {
+                    case 'critical': weight = 1.0; break;
+                    case 'high': weight = 0.8; break;
+                    case 'moderate': weight = 0.6; break;
+                    case 'low': weight = 0.4; break;
+                }
+                return [incident.lat, incident.lng, weight];
+            });
+
+            if (heatmapLayer) {
+                map.removeLayer(heatmapLayer);
+            }
+
+            heatmapLayer = L.heatLayer(heatData, {
+                radius: 30,
+                blur: 20,
+                maxZoom: 17,
+                gradient: {
+                    0.0: '#16a34a',
+                    0.4: '#f59e0b',
+                    0.7: '#dc2626',
+                    1.0: '#991b1b'
+                }
+            });
+
+            map.addLayer(heatmapLayer);
+        }
+
+        function createHazardZones() {
+            hazardLayer.clearLayers();
+            
+            // Sample hazard zones
+            const hazardZones = [
+                {
+                    name: 'Chemical Plant Risk Zone',
+                    center: [26.8467, 80.9462],
+                    radius: 1000,
+                    color: '#dc2626',
+                    fillOpacity: 0.2
+                },
+                {
+                    name: 'Flood Risk Area',
+                    center: [26.8467, 80.9462],
+                    radius: 800,
+                    color: '#3b82f6',
+                    fillOpacity: 0.2
+                }
+            ];
+
+            hazardZones.forEach(zone => {
+                const circle = L.circle(zone.center, {
+                    radius: zone.radius,
+                    color: zone.color,
+                    fillColor: zone.color,
+                    fillOpacity: zone.fillOpacity,
+                    weight: 2
+                }).bindPopup(`<strong>⚠️ ${zone.name}</strong><br>Radius: ${zone.radius}m`);
+                
+                hazardLayer.addLayer(circle);
+            });
+        }
+
+        // Utility Functions
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${type === 'success' ? '#16a34a' : type === 'error' ? '#dc2626' : '#3b82f6'};
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 10001;
+                font-weight: bold;
+                animation: slideInRight 0.3s ease;
+            `;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOutRight 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        function showModal(title, content) {
+            const modal = document.getElementById('incidentModal');
+            const modalContent = document.getElementById('modalContent');
+            
+            modalContent.innerHTML = content;
+            modal.querySelector('h2').textContent = title;
+            modal.classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('incidentModal').classList.remove('show');
+        }
+
+        // Map Control Functions
+        function findMyLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        
+                        map.setView([lat, lng], 15);
+                        
+                        L.marker([lat, lng], {
+                            icon: L.divIcon({
+                                html: '📍',
+                                className: 'user-location-marker',
+                                iconSize: [25, 25],
+                                iconAnchor: [12, 12]
+                            })
+                        }).addTo(map).bindPopup('📍 Your Location');
+                        
+                        showNotification('Location found', 'success');
+                    },
+                    (error) => {
+                        showNotification('Unable to get location', 'error');
+                    }
+                );
+            } else {
+                showNotification('Geolocation not supported', 'error');
+            }
+        }
+
+        function measureDistance() {
+            showNotification('Click two points on the map to measure distance', 'info');
+            
+            let clickCount = 0;
+            let firstPoint = null;
+            let measureLine = null;
+            
+            function onMapClick(e) {
+                if (clickCount === 0) {
+                    firstPoint = e.latlng;
+                    clickCount++;
+                    
+                    L.marker(firstPoint, {
+                        icon: L.divIcon({
+                            html: '📍',
+                            className: 'measure-marker',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    }).addTo(map);
+                    
+                    showNotification('Click second point', 'info');
+                } else {
+                    const secondPoint = e.latlng;
+                    const distance = firstPoint.distanceTo(secondPoint);
+                    
+                    measureLine = L.polyline([firstPoint, secondPoint], {
+                        color: '#dc2626',
+                        weight: 3,
+                        dashArray: '10, 10'
+                    }).addTo(map);
+                    
+                    L.marker(secondPoint, {
+                        icon: L.divIcon({
+                            html: '📍',
+                            className: 'measure-marker',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    }).addTo(map);
+                    
+                    const midpoint = L.latLng(
+                        (firstPoint.lat + secondPoint.lat) / 2,
+                        (firstPoint.lng + secondPoint.lng) / 2
+                    );
+                    
+                    L.marker(midpoint, {
+                        icon: L.divIcon({
+                            html: `<div style="background: white; padding: 0.5rem; border-radius: 4px; font-weight: bold; color: #1f2937; border: 2px solid #dc2626;">
+                                ${(distance / 1000).toFixed(2)} km
+                            </div>`,
+                            className: 'distance-label',
+                            iconSize: [80, 30],
+                            iconAnchor: [40, 15]
+                        })
+                    }).addTo(map);
+                    
+                    showNotification(`Distance: ${(distance / 1000).toFixed(2)} km`, 'success');
+                    
+                    map.off('click', onMapClick);
+                    clickCount = 0;
+                }
+            }
+            
+            map.on('click', onMapClick);
+        }
+
+        function drawZone() {
+            showNotification('Use the drawing tools on the right to draw zones', 'info');
+        }
+
+        function addWaypoint() {
+            showNotification('Click on the map to add a waypoint', 'info');
+            
+            function onMapClick(e) {
+                const waypoint = L.marker(e.latlng, {
+                    icon: L.divIcon({
+                        html: '📌',
+                        className: 'waypoint-marker',
+                        iconSize: [25, 25],
+                        iconAnchor: [12, 12]
+                    })
+                }).addTo(map);
+                
+                waypoint.bindPopup(`
+                    <div>
+                        <strong>📌 Waypoint</strong><br>
+                        Lat: ${e.latlng.lat.toFixed(6)}<br>
+                        Lng: ${e.latlng.lng.toFixed(6)}<br>
+                        <button onclick="this.closest('.leaflet-popup').previousSibling.remove(); map.closePopup();" style="background: #dc2626; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 4px; margin-top: 0.5rem; cursor: pointer;">
+                            Remove
+                        </button>
+                    </div>
+                `).openPopup();
+                
+                map.off('click', onMapClick);
+                showNotification('Waypoint added', 'success');
+            }
+            
+            map.on('click', onMapClick);
+        }
+
+        // Action Button Functions
+        function assignResources(incidentId) {
+            const availableResources = currentResources.filter(r => r.status === 'available');
+            
+            if (availableResources.length === 0) {
+                showNotification('No available resources', 'error');
+                return;
+            }
+            
+            showModal('Assign Resources', `
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <h3>Available Resources:</h3>
+                    ${availableResources.map(resource => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: 6px;">
+                            <div>
+                                <strong>${resource.id}</strong> - ${resource.type}<br>
+                                <span style="color: #6b7280; font-size: 0.9rem;">Crew: ${resource.crew} members</span>
+                            </div>
+                            <button onclick="assignResourceToIncident('${resource.id}', '${incidentId}')" style="background: #16a34a; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                                Assign
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            `);
+        }
+
+        function assignResourceToIncident(resourceId, incidentId) {
+            const resource = currentResources.find(r => r.id === resourceId);
+            const incident = currentIncidents.find(i => i.id === incidentId);
+            
+            if (resource && incident) {
+                resource.status = 'deployed';
+                resource.assignedTo = incidentId;
+                
+                if (!incident.assignedResources.includes(resourceId)) {
+                    incident.assignedResources.push(resourceId);
+                }
+                
+                renderResources();
+                showIncidentDetails(incidentId);
+                closeModal();
+                showNotification(`${resourceId} assigned to ${incidentId}`, 'success');
+            }
+        }
+
+        function escalateIncident(incidentId) {
+            const incident = currentIncidents.find(i => i.id === incidentId);
+            if (incident) {
+                const severityLevels = ['low', 'moderate', 'high', 'critical'];
+                const currentIndex = severityLevels.indexOf(incident.severity);
+                
+                if (currentIndex < severityLevels.length - 1) {
+                    incident.severity = severityLevels[currentIndex + 1];
+                    incident.status = 'escalated';
+                    
+                    renderIncidents();
+                    showIncidentDetails(incidentId);
+                    updateStatistics();
+                    showNotification(`Incident ${incidentId} escalated to ${incident.severity}`, 'warning');
+                } else {
+                    showNotification('Incident already at maximum severity', 'error');
+                }
+            }
+        }
+
+        function updateStatus(incidentId) {
+            showModal('Update Status', `
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <h3>Update Status for ${incidentId}:</h3>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <button onclick="changeIncidentStatus('${incidentId}', 'active')" style="background: #f59e0b; color: white; border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                            🟡 Mark as Active
+                        </button>
+                        <button onclick="changeIncidentStatus('${incidentId}', 'pending')" style="background: #3b82f6; color: white; border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                            🔵 Mark as Pending
+                        </button>
+                        <button onclick="changeIncidentStatus('${incidentId}', 'resolved')" style="background: #16a34a; color: white; border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                            ✅ Mark as Resolved
+                        </button>
+                        <button onclick="changeIncidentStatus('${incidentId}', 'escalated')" style="background: #dc2626; color: white; border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                            🚨 Mark as Escalated
+                        </button>
+                    </div>
+                </div>
+            `);
+        }
+
+        function changeIncidentStatus(incidentId, newStatus) {
+            const incident = currentIncidents.find(i => i.id === incidentId);
+            if (incident) {
+                incident.status = newStatus;
+                
+                // If resolved, free up assigned resources
+                if (newStatus === 'resolved') {
+                    incident.assignedResources.forEach(resourceId => {
+                        const resource = currentResources.find(r => r.id === resourceId);
+                        if (resource) {
+                            resource.status = 'available';
+                            resource.assignedTo = null;
+                        }
+                    });
+                }
+                
+                renderIncidents();
+                renderResources();
+                showIncidentDetails(incidentId);
+                updateStatistics();
+                closeModal();
+                showNotification(`Status updated to ${newStatus}`, 'success');
+            }
+        }
+
+        function centerMapOnIncident(incidentId) {
+            const incident = currentIncidents.find(i => i.id === incidentId);
+            if (incident) {
+                map.setView([incident.lat, incident.lng], 15);
+                showNotification('Map centered on incident', 'success');
+            }
+        }
+
+        function manageResource(resourceId) {
+            const resource = currentResources.find(r => r.id === resourceId);
+            if (!resource) return;
+            
+            showModal('Manage Resource', `
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <h3>${resource.id} - ${resource.type}</h3>
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px;">
+                        <p><strong>Status:</strong> ${resource.status}</p>
+                        <p><strong>Crew:</strong> ${resource.crew} members</p>
+                        <p><strong>Location:</strong> ${resource.lat}, ${resource.lng}</p>
+                        ${resource.assignedTo ? `<p><strong>Assigned to:</strong> ${resource.assignedTo}</p>` : ''}
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <button onclick="changeResourceStatus('${resourceId}', 'available')" style="background: #16a34a; color: white; border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                            ✅ Mark Available
+                        </button>
+                        <button onclick="changeResourceStatus('${resourceId}', 'maintenance')" style="background: #6b7280; color: white; border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                            🔧 Send to Maintenance
+                        </button>
+                        <button onclick="changeResourceStatus('${resourceId}', 'emergency')" style="background: #dc2626; color: white; border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                            🚨 Emergency Deploy
+                        </button>
+                        <button onclick="relocateResource('${resourceId}')" style="background: #3b82f6; color: white; border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                            📍 Relocate
+                        </button>
+                    </div>
+                </div>
+            `);
+        }
+
+        function changeResourceStatus(resourceId, newStatus) {
+            const resource = currentResources.find(r => r.id === resourceId);
+            if (resource) {
+                resource.status = newStatus;
+                
+                if (newStatus !== 'deployed') {
+                    resource.assignedTo = null;
+                }
+                
+                renderResources();
+                updateStatistics();
+                closeModal();
+                showNotification(`Resource status updated to ${newStatus}`, 'success');
+            }
+        }
+
+        function relocateResource(resourceId) {
+            showNotification('Click on the map to relocate the resource', 'info');
+            closeModal();
+            
+            function onMapClick(e) {
+                const resource = currentResources.find(r => r.id === resourceId);
+                if (resource) {
+                    resource.lat = e.latlng.lat;
+                    resource.lng = e.latlng.lng;
+                    renderResources();
+                    showNotification(`${resourceId} relocated`, 'success');
+                }
+                map.off('click', onMapClick);
+            }
+            
+            map.on('click', onMapClick);
+        }
+
+        // Bulk Action Functions
+        function exportAllIncidents() {
+            const csvContent = [
+                ['ID', 'Title', 'Type', 'Severity', 'Status', 'Latitude', 'Longitude', 'Timestamp', 'Description', 'Affected Persons', 'Reporter'].join(','),
+                ...currentIncidents.map(incident => [
+                    incident.id,
+                    `"${incident.title}"`,
+                    incident.type,
+                    incident.severity,
+                    incident.status,
+                    incident.lat,
+                    incident.lng,
+                    incident.timestamp.toISOString(),
+                    `"${incident.description}"`,
+                    incident.affectedPersons,
+                    `"${incident.reporter}"`
+                ].join(','))
+            ].join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `incidents-export-${new Date().toISOString().slice(0, 19)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            closeModal();
+            showNotification('Incidents exported to CSV', 'success');
+        }
+
+        function markAllResolved() {
+            const lowPriorityIncidents = currentIncidents.filter(i => i.severity === 'low' && i.status !== 'resolved');
+            
+            lowPriorityIncidents.forEach(incident => {
+                incident.status = 'resolved';
+                incident.assignedResources.forEach(resourceId => {
+                    const resource = currentResources.find(r => r.id === resourceId);
+                    if (resource) {
+                        resource.status = 'available';
+                        resource.assignedTo = null;
+                    }
+                });
+            });
+
+            renderIncidents();
+            renderResources();
+            updateStatistics();
+            closeModal();
+            showNotification(`${lowPriorityIncidents.length} low priority incidents marked as resolved`, 'success');
+        }
+
+        function generateReport() {
+            const reportData = {
+                timestamp: new Date().toLocaleString(),
+                summary: {
+                    totalIncidents: currentIncidents.length,
+                    byStatus: {
+                        active: currentIncidents.filter(i => i.status === 'active').length,
+                        pending: currentIncidents.filter(i => i.status === 'pending').length,
+                        resolved: currentIncidents.filter(i => i.status === 'resolved').length,
+                        escalated: currentIncidents.filter(i => i.status === 'escalated').length
+                    },
+                    bySeverity: {
+                        critical: currentIncidents.filter(i => i.severity === 'critical').length,
+                        high: currentIncidents.filter(i => i.severity === 'high').length,
+                        moderate: currentIncidents.filter(i => i.severity === 'moderate').length,
+                        low: currentIncidents.filter(i => i.severity === 'low').length
+                    },
+                    resources: {
+                        total: currentResources.length,
+                        available: currentResources.filter(r => r.status === 'available').length,
+                        deployed: currentResources.filter(r => r.status === 'deployed').length,
+                        maintenance: currentResources.filter(r => r.status === 'maintenance').length
+                    }
+                }
+            };
+
+            showModal('Situation Report', `
+                <div style="font-family: monospace; background: #f8fafc; padding: 1rem; border-radius: 8px; white-space: pre-line;">
+=== CRISIS SITUATION REPORT ===
+Generated: ${reportData.timestamp}
+
+INCIDENT SUMMARY:
+• Total Incidents: ${reportData.summary.totalIncidents}
+• Active: ${reportData.summary.byStatus.active}
+• Pending: ${reportData.summary.byStatus.pending}
+• Resolved: ${reportData.summary.byStatus.resolved}
+• Escalated: ${reportData.summary.byStatus.escalated}
+
+SEVERITY BREAKDOWN:
+• Critical: ${reportData.summary.bySeverity.critical}
+• High: ${reportData.summary.bySeverity.high}
+• Moderate: ${reportData.summary.bySeverity.moderate}
+• Low: ${reportData.summary.bySeverity.low}
+
+RESOURCE STATUS:
+• Total Resources: ${reportData.summary.resources.total}
+• Available: ${reportData.summary.resources.available}
+• Deployed: ${reportData.summary.resources.deployed}
+• In Maintenance: ${reportData.summary.resources.maintenance}
+
+=== END REPORT ===
+                </div>
+                <div style="margin-top: 1rem; text-align: center;">
+                    <button onclick="downloadReport()" style="background: #3b82f6; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                        📄 Download Report
+                    </button>
+                </div>
+            `);
+        }
+
+        function downloadReport() {
+            const reportText = document.querySelector('.modal-content pre, .modal-content div[style*="monospace"]').textContent;
+            const blob = new Blob([reportText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `situation-report-${new Date().toISOString().slice(0, 19)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            closeModal();
+            showNotification('Report downloaded', 'success');
+        }
+
+        function clearResolvedIncidents() {
+            const resolvedCount = currentIncidents.filter(i => i.status === 'resolved').length;
+            
+            if (resolvedCount === 0) {
+                showNotification('No resolved incidents to clear', 'error');
+                closeModal();
+                return;
+            }
+
+            currentIncidents = currentIncidents.filter(i => i.status !== 'resolved');
+            renderIncidents();
+            updateStatistics();
+            closeModal();
+            showNotification(`${resolvedCount} resolved incidents cleared`, 'success');
+        }
+
+        function activateEmergencyProtocol() {
+            // Simulate emergency protocol activation
+            showNotification('🚨 EMERGENCY PROTOCOL ACTIVATED', 'error');
+            
+            // Add visual indicators
+            document.body.style.animation = 'pulse 1s infinite';
+            
+            // Auto-escalate all incidents
+            currentIncidents.forEach(incident => {
+                if (incident.status === 'active') {
+                    incident.status = 'escalated';
+                    if (incident.severity !== 'critical') {
+                        incident.severity = 'critical';
+                    }
+                }
+            });
+            
+            renderIncidents();
+            updateStatistics();
+            closeModal();
+            
+            setTimeout(() => {
+                document.body.style.animation = '';
+                showNotification('Emergency protocols are now active. All units have been notified.', 'warning');
+            }, 3000);
+        }
+
+        // Filter Functions
+        function setupFilters() {
+            const filters = ['statusFilter', 'severityFilter', 'typeFilter'];
+            
+            filters.forEach(filterId => {
+                document.getElementById(filterId).addEventListener('change', applyFilters);
+            });
+        }
+
+        function applyFilters() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const severityFilter = document.getElementById('severityFilter').value;
+            const typeFilter = document.getElementById('typeFilter').value;
+            
+            incidentLayer.clearLayers();
+            
+            let filteredIncidents = [...currentIncidents];
+            
+            if (statusFilter) {
+                filteredIncidents = filteredIncidents.filter(i => i.status === statusFilter);
+            }
+            
+            if (severityFilter) {
+                filteredIncidents = filteredIncidents.filter(i => i.severity === severityFilter);
+            }
+            
+            if (typeFilter) {
+                filteredIncidents = filteredIncidents.filter(i => i.type === typeFilter);
+            }
+            
+            filteredIncidents.forEach(incident => {
+                const icon = getIncidentIcon(incident.severity, incident.type);
+                const marker = L.marker([incident.lat, incident.lng], { icon })
+                    .bindPopup(createIncidentPopup(incident))
+                    .on('click', () => showIncidentDetails(incident));
+                
+                incidentLayer.addLayer(marker);
+            });
+            
+            showNotification(`Showing ${filteredIncidents.length} incidents`, 'info');
+        }
+
+        // Initialize Application
+        function initializeApp() {
+            console.log('🚀 Initializing Crisis Command Map...');
+            
+            // Initialize map
+            initializeMap();
+            
+            // Generate sample data
+            generateSampleData();
+            
+            // Render initial data
+            renderIncidents();
+            updateStatistics();
+            
+            // Setup event listeners
+            setupLayerToggles();
+            setupFilters();
+            
+            // Setup timeline slider
+            document.getElementById('timelineSlider').addEventListener('input', () => {
+                updateTimelineDisplay();
+                filterIncidentsByTime();
+            });
+            
+            // Initialize timeline display
+            updateTimelineDisplay();
+            
+            // Setup modal close handlers
+            document.getElementById('incidentModal').addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) {
+                    closeModal();
+                }
+            });
+            
+            // Setup auto-refresh
+            setInterval(() => {
+                updateStatistics();
+            }, 30000); // Update every 30 seconds
+            
+            // Add CSS animations
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideInRight {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOutRight {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+                @keyframes pulse {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                    100% { opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            console.log('✅ Crisis Command Map initialized successfully');
+            showNotification('🗺️ Crisis Command Map loaded', 'success');
+        }
+
+        // Start the application when DOM is ready
+        document.addEventListener('DOMContentLoaded', initializeApp);
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            setTimeout(() => {
+                if (map) {
+                    map.invalidateSize();
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>
+
+
+
+

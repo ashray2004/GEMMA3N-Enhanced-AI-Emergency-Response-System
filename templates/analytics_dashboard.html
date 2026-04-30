@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crisis Analytics Dashboard - Emergency Command</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .analytics-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        /* Header Styles */
+        .page-header {
+            text-align: center;
+            color: white;
+            margin-bottom: 2rem;
+            padding: 2rem 0;
+        }
+
+        .page-title {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(45deg, #ffffff, #e0e7ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .page-subtitle {
+            font-size: 1.3rem;
+            opacity: 0.9;
+            font-weight: 400;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Controls Bar */
+        .controls-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            align-items: center;
+            flex-wrap: wrap;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1.5rem;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .time-selector,
+        .filter-select {
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.9);
+            color: #374151;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            min-width: 140px;
+        }
+
+        .time-selector:focus,
+        .filter-select:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }
+
+        .time-selector option,
+        .filter-select option {
+            background: white;
+            color: #374151;
+        }
+
+        .action-btn {
+            padding: 0.75rem 1.5rem;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .refresh-btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+
+        .command-btn {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+        }
+
+        .predict-btn {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+        }
+
+        /* Status Header */
+        .status-header {
+            background: linear-gradient(135deg, rgba(30, 64, 175, 0.9), rgba(55, 48, 163, 0.9));
+            backdrop-filter: blur(20px);
+            color: white;
+            padding: 2rem;
+            border-radius: 16px;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .status-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-indicator {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.8;
+                transform: scale(1.1);
+            }
+        }
+
+        .status-info h3 {
+            margin: 0;
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+
+        .last-updated {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-top: 0.25rem;
+        }
+
+        /* KPI Grid */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .kpi-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+        }
+
+        .kpi-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .kpi-icon {
+            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+        }
+
+        .kpi-trend {
+            font-size: 0.85rem;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .kpi-trend.up {
+            background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+            color: #16a34a;
+        }
+
+        .kpi-trend.down {
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+            color: #dc2626;
+        }
+
+        .kpi-trend.stable {
+            background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+            color: #6b7280;
+        }
+
+        .kpi-value {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+            line-height: 1;
+        }
+
+        .kpi-label {
+            color: #6b7280;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .kpi-subtitle {
+            color: #9ca3af;
+            font-size: 0.85rem;
+        }
+
+        /* AI Insights Panel */
+        .ai-insights {
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.9), rgba(91, 33, 182, 0.9));
+            backdrop-filter: blur(20px);
+            color: white;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .ai-insights h3 {
+            margin: 0 0 1.5rem 0;
+            font-size: 1.6rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .insight-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border-left: 4px solid #fbbf24;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .insight-card:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .insight-type {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.9;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+
+        .insight-text {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            font-weight: 400;
+        }
+
+        /* Charts Section */
+        .charts-section {
+            margin-bottom: 2rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 2rem;
+        }
+
+        .chart-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .chart-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #f1f5f9;
+        }
+
+        .chart-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #374151;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .chart-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .chart-btn {
+            padding: 0.5rem 1rem;
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #374151;
+        }
+
+        .chart-btn:hover {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-content {
+            min-height: 320px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 2px dashed #3b82f6;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1e40af;
+            font-weight: 600;
+            text-align: center;
+            position: relative;
+            padding: 2rem;
+        }
+
+        .interactive-chart {
+            background: linear-gradient(135deg, #ffffff, #f8fafc);
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 0.5rem 0;
+        }
+
+        /* Stat Bars */
+        .stat-bar {
+            background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+            height: 32px;
+            border-radius: 16px;
+            margin: 1rem 0;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-fill {
+            height: 100%;
+            border-radius: 16px;
+            transition: width 1s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 700;
+            position: relative;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .stat-label {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #374151;
+            z-index: 10;
+        }
+
+        .stat-fill.critical {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+        }
+
+        .stat-fill.high {
+            background: linear-gradient(135deg, #ea580c, #c2410c);
+        }
+
+        .stat-fill.moderate {
+            background: linear-gradient(135deg, #ca8a04, #a16207);
+        }
+
+        .stat-fill.low {
+            background: linear-gradient(135deg, #16a34a, #15803d);
+        }
+
+        .stat-fill.red {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+        }
+
+        .stat-fill.yellow {
+            background: linear-gradient(135deg, #eab308, #ca8a04);
+        }
+
+        .stat-fill.green {
+            background: linear-gradient(135deg, #16a34a, #15803d);
+        }
+
+        .stat-fill.black {
+            background: linear-gradient(135deg, #374151, #1f2937);
+        }
+
+        /* Response Time Cards */
+        .response-time-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .response-time-card {
+            text-align: center;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+
+        .response-time-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .response-time-value {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+        }
+
+        .response-time-value.best {
+            color: #16a34a;
+        }
+
+        .response-time-value.worst {
+            color: #dc2626;
+        }
+
+        .response-time-label {
+            font-size: 0.9rem;
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        /* Export Section */
+        .export-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-top: 2rem;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .export-section h3 {
+            margin-bottom: 2rem;
+            color: #374151;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .export-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .export-btn {
+            background: linear-gradient(135deg, #16a34a, #15803d);
+            color: white;
+            padding: 1rem 1.5rem;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .export-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .export-btn.pdf {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+        }
+
+        .export-btn.exec {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+        }
+
+        .export-btn.schedule {
+            background: linear-gradient(135deg, #059669, #047857);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .kpi-grid {
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            .analytics-container {
+                padding: 1rem;
+            }
+
+            .page-title {
+                font-size: 2.5rem;
+            }
+
+            .kpi-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+            }
+
+            .kpi-card {
+                padding: 1.5rem;
+            }
+
+            .kpi-value {
+                font-size: 2.5rem;
+            }
+
+            .insights-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .export-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .controls-bar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 1rem;
+            }
+
+            .status-header {
+                flex-direction: column;
+                text-align: center;
+                gap: 1.5rem;
+            }
+
+            .chart-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 1rem;
+            }
+
+            .response-time-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .page-title {
+                font-size: 2rem;
+            }
+
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .chart-card {
+                padding: 1.5rem;
+            }
+
+            .section-title {
+                font-size: 1.5rem;
+            }
+        }
+
+        /* Loading Animation */
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        /* Notification Styles */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            max-width: 400px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background: linear-gradient(135deg, #16a34a, #15803d);
+        }
+
+        .notification.error {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+        }
+
+        .notification.info {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+        }
+    </style>
+</head>
+<body>
+    <div class="analytics-container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1 class="page-title">📊 Crisis Analytics Dashboard</h1>
+            <p class="page-subtitle">Operational Intelligence & Decision Support</p>
+        </div>
+
+        <!-- Controls Bar -->
+        <div class="controls-bar">
+            <select id="timeRangeSelector" class="time-selector" onchange="changeTimeRange()">
+                <option value="4h">Last 4 Hours</option>
+                <option value="24h" selected>Last 24 Hours</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="custom">Custom Range</option>
+            </select>
+
+            <select id="regionFilter" class="filter-select" onchange="applyFilters()">
+                <option value="">All Regions</option>
+                <option value="north">North District</option>
+                <option value="south">South District</option>
+                <option value="central">Central District</option>
+                <option value="west">West District</option>
+            </select>
+
+            <select id="severityFilter" class="filter-select" onchange="applyFilters()">
+                <option value="">All Severities</option>
+                <option value="critical">Critical Only</option>
+                <option value="high">High Priority</option>
+                <option value="moderate">Moderate</option>
+            </select>
+
+            <button onclick="refreshDashboard()" class="action-btn refresh-btn">🔄 Refresh</button>
+            <a href="/crisis-command-center" class="action-btn command-btn">🧠 Command Center</a>
+            <a href="/predictive-analytics-dashboard" class="action-btn predict-btn">🔮 Forecasts</a>
+        </div>
+
+        <!-- Status Header -->
+        <div class="status-header">
+            <div class="status-info">
+                <div class="status-indicator"></div>
+                <div>
+                    <h3>Crisis Analytics Dashboard - Last 24 Hours</h3>
+                    <div class="last-updated">Last updated: <span id="timestamp">15:42:18</span> | Auto-refresh: ON</div>
+                </div>
+            </div>
+            <div>
+                <button onclick="exportExecutiveBrief()" class="action-btn exec">📋 Executive Brief</button>
+            </div>
+        </div>
+
+        <!-- KPI Dashboard -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <div class="kpi-icon">🚨</div>
+                    <span class="kpi-trend up">↑ 5%</span>
+                </div>
+                <div class="kpi-value">42</div>
+                <div class="kpi-label">Total Incidents</div>
+                <div class="kpi-subtitle">8 today</div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <div class="kpi-icon">🏥</div>
+                    <span class="kpi-trend stable">→</span>
+                </div>
+                <div class="kpi-value">15</div>
+                <div class="kpi-label">Active Patients</div>
+                <div class="kpi-subtitle">3 critical</div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <div class="kpi-icon">⏱️</div>
+                    <span class="kpi-trend down">↓ 12%</span>
+                </div>
+                <div class="kpi-value">6.2 min</div>
+                <div class="kpi-label">Avg Response Time</div>
+                <div class="kpi-subtitle">Target: < 8 min</div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <div class="kpi-icon">🤖</div>
+                    <span class="kpi-trend up">↑ 3%</span>
+                </div>
+                <div class="kpi-value">94%</div>
+                <div class="kpi-label">AI Accuracy</div>
+                <div class="kpi-subtitle">127 auto-classified</div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <div class="kpi-icon">✅</div>
+                    <span class="kpi-trend up">↑ 8%</span>
+                </div>
+                <div class="kpi-value">38</div>
+                <div class="kpi-label">Resolved Cases</div>
+                <div class="kpi-subtitle">92% success rate</div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <div class="kpi-icon">📊</div>
+                    <span class="kpi-trend stable">→</span>
+                </div>
+                <div class="kpi-value">78%</div>
+                <div class="kpi-label">Resource Utilization</div>
+                <div class="kpi-subtitle">23 available</div>
+            </div>
+        </div>
+
+        <!-- AI Insights Panel -->
+        <div class="ai-insights">
+            <h3>🤖 AI Intelligence Highlights</h3>
+            <div class="insights-grid">
+                <div class="insight-card">
+                    <div class="insight-type">Pattern Detection</div>
+                    <div class="insight-text">Spike in respiratory cases detected in North District - monitoring air quality correlation</div>
+                </div>
+                <div class="insight-card">
+                    <div class="insight-type">Resource Optimization</div>
+                    <div class="insight-text">Reposition 2 ambulances to reduce average response time by 15% during peak hours</div>
+                </div>
+                <div class="insight-card">
+                    <div class="insight-type">Trend Analysis</div>
+                    <div class="insight-text">Traffic incidents increased 23% on weekends - suggest additional patrol deployment</div>
+                </div>
+                <div class="insight-card">
+                    <div class="insight-type">Risk Assessment</div>
+                    <div class="insight-text">Weather conditions indicate 68% probability of surge events in next 6 hours</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-section">
+            <div class="section-header">
+                <h2 class="section-title">📈 Operational Trends & Performance</h2>
+            </div>
+
+            <div class="charts-grid">
+                <!-- Resource Utilization Chart -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">🚑 Resource Utilization</h3>
+                        <div class="chart-actions">
+                            <button class="chart-btn" onclick="drillDownResource('all')">All</button>
+                            <button class="chart-btn" onclick="drillDownResource('medical')">Medical</button>
+                            <button class="chart-btn" onclick="drillDownResource('fire')">Fire</button>
+                        </div>
+                    </div>
+                    <div class="interactive-chart">
+                        <div style="display: flex; align-items: center; margin: 1rem 0;">
+                            <span class="stat-label">Ambulances:</span>
+                            <div class="stat-bar" style="flex: 1; margin-left: 120px;">
+                                <div class="stat-fill moderate" style="width: 67%;">
+                                    8/12 (67%)
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; margin: 1rem 0;">
+                            <span class="stat-label">Fire Engines:</span>
+                            <div class="stat-bar" style="flex: 1; margin-left: 120px;">
+                                <div class="stat-fill moderate" style="width: 63%;">
+                                    5/8 (63%)
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; margin: 1rem 0;">
+                            <span class="stat-label">Police Units:</span>
+                            <div class="stat-bar" style="flex: 1; margin-left: 120px;">
+                                <div class="stat-fill high" style="width: 80%;">
+                                    12/15 (80%)
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; margin: 1rem 0;">
+                            <span class="stat-label">Medical Staff:</span>
+                            <div class="stat-bar" style="flex: 1; margin-left: 120px;">
+                                <div class="stat-fill high" style="width: 80%;">
+                                    28/35 (80%)
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; margin: 1rem 0;">
+                            <span class="stat-label">ICU Beds:</span>
+                            <div class="stat-bar" style="flex: 1; margin-left: 120px;">
+                                <div class="stat-fill high" style="width: 78%;">
+                                    14/18 (78%)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Triage Effectiveness Chart -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">🏥 Triage Effectiveness</h3>
+                        <div class="chart-actions">
+                            <button class="chart-btn" onclick="showTriageDetails()">Details</button>
+                        </div>
+                    </div>
+                    <div class="interactive-chart">
+                        <div style="display: flex; align-items: center; margin: 1rem 0;">
+                            <span class="stat-label">Red (Critical):</span>
+                            <div class="stat-bar" style="flex: 1; margin-left: 120px;">
+                                <div class="stat-fill red" style="width: 19%;">
+                                    5 (19.2%)
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; margin: 1rem 0;">
+                            <span class="stat-label">Yellow (Urgent):</span>
+                            <div class="stat-bar" style="flex: 1; margin-left: 120px;">
+                                <div class="stat-fill yellow" style="width: 31%;">
+                                    8 (30.8%)
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; margin: 1rem 0;">
+                            <span class="stat-label">Green (Stable):</span>
+                            <div class="stat-bar" style="flex: 1; margin-left: 120px;">
+                                <div class="stat-fill green" style="width: 46%;">
+                                    12 (46.2%)
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; margin: 1rem 0;">
+                            <span class="stat-label">Black (Deceased):</span>
+                            <div class="stat-bar" style="flex: 1; margin-left: 120px;">
+                                <div class="stat-fill black" style="width: 4%;">
+                                    1 (3.8%)
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 1.5rem; padding: 1rem; background: linear-gradient(135deg, #f8fafc, #f1f5f9); border-radius: 8px; font-size: 0.9rem; border-left: 4px solid #3b82f6;">
+                            <strong>AI Performance:</strong> Override Rate: 8% | Accuracy: 94%
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Geographic Hotspots -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">🗺️ Geographic Hotspots</h3>
+                        <div class="chart-actions">
+                            <button class="chart-btn" onclick="toggleMapView('incidents')">Incidents</button>
+                            <button class="chart-btn" onclick="toggleMapView('resources')">Resources</button>
+                        </div>
+                    </div>
+                    <div class="chart-content">
+                        <div style="width: 100%;">
+                            <div style="font-size: 1.3rem; margin-bottom: 1.5rem; font-weight: 700;">🎯 Active Hotspots</div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                                <div style="background: rgba(220, 38, 38, 0.1); padding: 1rem; border-radius: 8px; border-left: 4px solid #dc2626;">
+                                    <div style="font-weight: 600; color: #dc2626;">Downtown District</div>
+                                    <div style="font-size: 1.5rem; font-weight: 800; color: #dc2626;">18</div>
+                                    <div style="font-size: 0.8rem; opacity: 0.8;">incidents</div>
+                                </div>
+                                <div style="background: rgba(245, 158, 11, 0.1); padding: 1rem; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                                    <div style="font-weight: 600; color: #f59e0b;">Industrial Zone</div>
+                                    <div style="font-size: 1.5rem; font-weight: 800; color: #f59e0b;">12</div>
+                                    <div style="font-size: 0.8rem; opacity: 0.8;">incidents</div>
+                                </div>
+                                <div style="background: rgba(59, 130, 246, 0.1); padding: 1rem; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                                    <div style="font-weight: 600; color: #3b82f6;">Highway Corridor</div>
+                                    <div style="font-size: 1.5rem; font-weight: 800; color: #3b82f6;">9</div>
+                                    <div style="font-size: 0.8rem; opacity: 0.8;">incidents</div>
+                                </div>
+                                <div style="background: rgba(16, 185, 129, 0.1); padding: 1rem; border-radius: 8px; border-left: 4px solid #10b981;">
+                                    <div style="font-weight: 600; color: #10b981;">Medical District</div>
+                                    <div style="font-size: 1.5rem; font-weight: 800; color: #10b981;">7</div>
+                                    <div style="font-size: 0.8rem; opacity: 0.8;">incidents</div>
+                                </div>
+                            </div>
+                            <div style="font-size: 0.9rem; opacity: 0.8; text-align: center; font-style: italic;">
+                                Click regions for detailed incident analysis
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Response Time Analysis -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">⏱️ Response Time Analysis</h3>
+                        <div class="chart-actions">
+                            <button class="chart-btn" onclick="showResponseDetails()">Details</button>
+                        </div>
+                    </div>
+                    <div class="interactive-chart">
+                        <div class="response-time-grid">
+                            <div class="response-time-card">
+                                <div class="response-time-value best">2.1 min</div>
+                                <div class="response-time-label">Best Time</div>
+                            </div>
+                            <div class="response-time-card">
+                                <div class="response-time-value worst">18.4 min</div>
+                                <div class="response-time-label">Worst Time</div>
+                            </div>
+                        </div>
+
+                        <div style="margin: 1.5rem 0;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
+                                <span style="font-size: 1rem; font-weight: 600;">Target Met:</span>
+                                <span style="font-weight: 800; color: #16a34a; font-size: 1.1rem;">87%</span>
+                            </div>
+                            <div class="stat-bar">
+                                <div class="stat-fill green" style="width: 87%;">
+                                    87% within target
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="background: linear-gradient(135deg, #fef3c7, #fde68a); padding: 1rem; border-radius: 8px; border-left: 4px solid #f59e0b; margin-top: 1.5rem;">
+                            <div style="font-weight: 600; color: #92400e; margin-bottom: 0.5rem;">Bottlenecks Identified:</div>
+                            <div style="font-size: 0.9rem; color: #92400e;">
+                                • Traffic congestion during peak hours<br>
+                                • Equipment preparation time<br>
+                                • Communication delays
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Section -->
+        <div class="export-section">
+            <h3>📋 Reports & Data Export</h3>
+            <p style="color: #6b7280; margin-bottom: 1.5rem;">Generate comprehensive reports and export data for further analysis</p>
+            <div class="export-grid">
+                <button onclick="generateExecutiveBrief()" class="export-btn exec">
+                    📋 Executive Brief
+                </button>
+                <button onclick="exportPDF()" class="export-btn pdf">
+                    📄 PDF Report
+                </button>
+                <button onclick="exportCSV()" class="export-btn">
+                    📊 CSV Data
+                </button>
+                <button onclick="scheduleReport()" class="export-btn schedule">
+                    ⏰ Schedule Report
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dashboard State
+        let dashboardState = {
+            timeframe: '24h',
+            filters: { region: '', severity: '' },
+            autoRefresh: true,
+            isLoading: false
+        };
+
+        // Initialize Dashboard
+        window.addEventListener('load', function() {
+            console.log('📊 Crisis Analytics Dashboard initialized');
+            initializeDashboard();
+            startAutoRefresh();
+            animateElements();
+        });
+
+        function initializeDashboard() {
+            updateTimestamp();
+            console.log('Dashboard initialized with timeframe:', dashboardState.timeframe);
+            
+            // Animate KPI cards on load
+            setTimeout(() => {
+                animateKPICards();
+            }, 500);
+        }
+
+        function startAutoRefresh() {
+            if (dashboardState.autoRefresh) {
+                setInterval(function() {
+                    if (!dashboardState.isLoading) {
+                        refreshDashboard();
+                    }
+                }, 30000); // Refresh every 30 seconds
+            }
+        }
+
+        function updateTimestamp() {
+            const now = new Date();
+            const timeString = now.toTimeString().slice(0, 8);
+            const timestampEl = document.getElementById('timestamp');
+            if (timestampEl) {
+                timestampEl.textContent = timeString;
+            }
+        }
+
+        function refreshDashboard() {
+            console.log('🔄 Refreshing dashboard data...');
+            dashboardState.isLoading = true;
+            
+            // Add loading state
+            document.body.classList.add('loading');
+            
+            updateTimestamp();
+            
+            // Animate refresh indicator
+            const indicator = document.querySelector('.status-indicator');
+            if (indicator) {
+                indicator.style.background = '#fbbf24';
+                indicator.style.boxShadow = '0 0 15px rgba(251, 191, 36, 0.8)';
+                setTimeout(function() {
+                    indicator.style.background = '#10b981';
+                    indicator.style.boxShadow = '0 0 10px rgba(16, 185, 129, 0.5)';
+                }, 1000);
+            }
+            
+            // Simulate data refresh
+            setTimeout(() => {
+                document.body.classList.remove('loading');
+                dashboardState.isLoading = false;
+                showNotification('Dashboard refreshed successfully', 'success');
+                animateStatBars();
+            }, 1500);
+        }
+
+        function changeTimeRange() {
+            const selector = document.getElementById('timeRangeSelector');
+            const newTimeframe = selector.value;
+            
+            if (newTimeframe === 'custom') {
+                showCustomRangeDialog();
+                return;
+            }
+            
+            dashboardState.timeframe = newTimeframe;
+            showNotification('Time range updated to ' + newTimeframe, 'info');
+            refreshDashboard();
+        }
+
+        function applyFilters() {
+            const regionFilter = document.getElementById('regionFilter');
+            const severityFilter = document.getElementById('severityFilter');
+            
+            dashboardState.filters.region = regionFilter.value;
+            dashboardState.filters.severity = severityFilter.value;
+            
+            let filterMessage = 'Filters applied';
+            if (regionFilter.value) filterMessage += ' - Region: ' + regionFilter.options[regionFilter.selectedIndex].text;
+            if (severityFilter.value) filterMessage += ' - Severity: ' + severityFilter.options[severityFilter.selectedIndex].text;
+            
+            showNotification(filterMessage, 'info');
+            refreshDashboard();
+        }
+
+        function showCustomRangeDialog() {
+            const startDate = prompt('Enter start date (YYYY-MM-DD):');
+            const endDate = prompt('Enter end date (YYYY-MM-DD):');
+            
+            if (startDate && endDate) {
+                dashboardState.timeframe = 'custom';
+                showNotification('Custom date range set: ' + startDate + ' to ' + endDate, 'success');
+                refreshDashboard();
+            } else {
+                document.getElementById('timeRangeSelector').value = dashboardState.timeframe;
+            }
+        }
+
+        // Chart Interactions
+        function drillDownResource(resourceType) {
+            console.log('🚑 Drilling down to resource type:', resourceType);
+            showNotification('Showing detailed view for ' + resourceType + ' resources', 'info');
+            
+            // Highlight the clicked button
+            const buttons = document.querySelectorAll('.chart-btn');
+            buttons.forEach(btn => btn.style.background = 'linear-gradient(135deg, #f8fafc, #e2e8f0)');
+            event.target.style.background = 'linear-gradient(135deg, #3b82f6, #2563eb)';
+            event.target.style.color = 'white';
+        }
+
+        function toggleMapView(viewType) {
+            console.log('🗺️ Toggling map view to:', viewType);
+            showNotification('Map updated to show ' + viewType, 'success');
+            
+            // Animate the map content
+            const mapContent = document.querySelector('.chart-content');
+            if (mapContent) {
+                mapContent.style.transform = 'scale(0.95)';
+                mapContent.style.opacity = '0.7';
+                setTimeout(() => {
+                    mapContent.style.transform = 'scale(1)';
+                    mapContent.style.opacity = '1';
+                }, 300);
+            }
+        }
+
+        function showTriageDetails() {
+            console.log('🏥 Showing triage details');
+            showNotification('Opening detailed triage analytics...', 'info');
+        }
+
+        function showResponseDetails() {
+            console.log('⏱️ Showing response time details');
+            showNotification('Opening detailed response time analysis...', 'info');
+        }
+
+        // Export Functions
+        function generateExecutiveBrief() {
+            console.log('📋 Generating executive brief...');
+            showNotification('Preparing executive brief...', 'info');
+            
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '⏳ Generating...';
+            button.disabled = true;
+            
+            setTimeout(function() {
+                button.innerHTML = originalText;
+                button.disabled = false;
+                showNotification('Executive brief generated successfully!', 'success');
+                downloadExecutiveBrief();
+            }, 2000);
+        }
+
+        function exportExecutiveBrief() {
+            generateExecutiveBrief();
+        }
+
+        function exportPDF() {
+            console.log('📄 Exporting PDF report...');
+            showNotification('Generating PDF report...', 'info');
+            
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '⏳ Processing...';
+            button.disabled = true;
+            
+            setTimeout(function() {
+                button.innerHTML = originalText;
+                button.disabled = false;
+                showNotification('PDF report generated successfully!', 'success');
+            }, 1500);
+        }
+
+        function exportCSV() {
+            console.log('📊 Exporting CSV data...');
+            showNotification('Preparing CSV export...', 'info');
+            
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '⏳ Exporting...';
+            button.disabled = true;
+            
+            setTimeout(function() {
+                button.innerHTML = originalText;
+                button.disabled = false;
+                showNotification('CSV data exported successfully!', 'success');
+            }, 1000);
+        }
+
+        function scheduleReport() {
+            console.log('⏰ Scheduling report...');
+            
+            const frequency = prompt('Report frequency (daily/weekly/monthly):');
+            const email = prompt('Email address for reports:');
+            
+            if (frequency && email) {
+                showNotification('Report scheduled: ' + frequency + ' reports to ' + email, 'success');
+            }
+        }
+
+        function downloadExecutiveBrief() {
+            const briefContent = `
+EXECUTIVE BRIEF - CRISIS ANALYTICS DASHBOARD
+Generated: ${new Date().toLocaleString()}
+Timeframe: ${dashboardState.timeframe}
+
+EXECUTIVE SUMMARY
+================
+The Crisis Analytics Dashboard provides comprehensive operational intelligence for emergency management decision-making. This brief summarizes key performance indicators, trends, and actionable insights for executive review.
+
+KEY PERFORMANCE INDICATORS
+===========================
+• Total Incidents: 42 (↑ 5% from previous period)
+• Active Patients: 15 (3 critical cases requiring immediate attention)
+• Average Response Time: 6.2 minutes (↓ 12% improvement)
+• AI System Accuracy: 94% (↑ 3% from last period)
+• Resolved Cases: 38 with 92% success rate
+• Resource Utilization: 78% across all units
+
+AI INTELLIGENCE HIGHLIGHTS
+============================
+• Pattern Detection: Spike in respiratory cases detected in North District - monitoring air quality correlation
+• Resource Optimization: Reposition 2 ambulances to reduce average response time by 15% during peak hours
+• Trend Analysis: Traffic incidents increased 23% on weekends - suggest additional patrol deployment
+• Risk Assessment: Weather conditions indicate 68% probability of surge events in next 6 hours
+
+OPERATIONAL PERFORMANCE
+========================
+• Peak Activity Hours: 14:00-18:00, 20:00-22:00
+• Geographic Hotspots: Downtown District (18 incidents), Industrial Zone (12 incidents)
+• Response Time Targets: 87% of incidents met target response times
+• Resource Bottlenecks: Traffic congestion, Equipment preparation time
+
+TRIAGE EFFECTIVENESS
+=====================
+• Red (Critical): 5 cases (19.2%)
+• Yellow (Urgent): 8 cases (30.8%)
+• Green (Stable): 12 cases (46.2%)
+• Black (Deceased): 1 case (3.8%)
+• AI Override Rate: 8% | AI Accuracy: 94%
+
+STRATEGIC RECOMMENDATIONS
+===========================
+• Continue monitoring critical patient volume in North District
+• Consider additional resource allocation during peak hours (14:00-18:00)
+• Review response time bottlenecks in identified areas
+• Implement AI-suggested ambulance repositioning within 2 hours
+• Monitor respiratory case cluster for environmental factors
+• Address traffic congestion impact on response times
+
+RESOURCE UTILIZATION STATUS
+=============================
+• Ambulances: 8/12 active (67% utilization)
+• Fire Engines: 5/8 active (63% utilization)
+• Police Units: 12/15 active (80% utilization)
+• Medical Staff: 28/35 active (80% utilization)
+• ICU Beds: 14/18 occupied (78% utilization)
+
+Report prepared by: Crisis Analytics AI System
+Confidence Level: High (94% accuracy rate)
+Next scheduled update: ${new Date(Date.now() + 30*60*1000).toLocaleString()}
+
+This document contains sensitive operational information and should be handled according to organizational security protocols.
+            `;
+            
+            const blob = new Blob([briefContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'executive-brief-' + new Date().toISOString().slice(0, 10) + '.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Animation Effects
+        function animateElements() {
+            animateKPICards();
+            setTimeout(() => {
+                animateStatBars();
+            }, 1000);
+        }
+
+        function animateKPICards() {
+            const kpiCards = document.querySelectorAll('.kpi-card');
+            kpiCards.forEach(function(card, index) {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(30px)';
+                card.style.transition = 'all 0.6s ease';
+                
+                setTimeout(function() {
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 150);
+            });
+        }
+
+        function animateStatBars() {
+            const statFills = document.querySelectorAll('.stat-fill');
+            statFills.forEach(function(bar) {
+                const width = bar.style.width;
+                bar.style.width = '0%';
+                setTimeout(function() {
+                    bar.style.width = width;
+                }, 200);
+            });
+        }
+
+        // Notification System
+        function showNotification(message, type) {
+            type = type || 'info';
+            
+            // Remove existing notifications
+            const existingNotifications = document.querySelectorAll('.notification');
+            existingNotifications.forEach(notif => {
+                if (document.body.contains(notif)) {
+                    document.body.removeChild(notif);
+                }
+            });
+            
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(function() {
+                notification.classList.add('show');
+            }, 100);
+            
+            setTimeout(function() {
+                notification.classList.remove('show');
+                setTimeout(function() {
+                    if (document.body.contains(notification)) {
+                        document.body.removeChild(notification);
+                    }
+                }, 300);
+            }, 4000);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch (e.key) {
+                    case 'r':
+                        e.preventDefault();
+                        refreshDashboard();
+                        break;
+                    case 'e':
+                        e.preventDefault();
+                        generateExecutiveBrief();
+                        break;
+                    case 'f':
+                        e.preventDefault();
+                        const regionFilter = document.getElementById('regionFilter');
+                        if (regionFilter) regionFilter.focus();
+                        break;
+                }
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            // Recalculate chart dimensions if needed
+            setTimeout(() => {
+                animateStatBars();
+            }, 300);
+        });
+
+        // Page visibility API to pause/resume updates
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                dashboardState.autoRefresh = false;
+            } else {
+                dashboardState.autoRefresh = true;
+                startAutoRefresh();
+                refreshDashboard();
+            }
+        });
+    </script>
+</body>
+</html>
+
+

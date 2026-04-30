@@ -1,0 +1,1884 @@
+{% extends "base.html" %}
+
+{% block title %}Report Archive - Emergency Response Assistant{% endblock %}
+{% block page_title %}📚 Report Archive{% endblock %}
+{% block subtitle %}Browse, search and manage archived emergency reports{% endblock %}
+
+{% block extra_css %}
+{{ super() }}
+<style>
+  .status-indicator { white-space: nowrap !important; font-size: 0.75rem !important; }
+  /* Navigation Breadcrumb */
+  .breadcrumb-nav {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+    border: 1px solid #e5e7eb;
+  }
+
+  .breadcrumb-nav a {
+    color: #3b82f6;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .breadcrumb-nav a:hover {
+    color: #2563eb;
+    text-decoration: underline;
+  }
+
+  .archive-controls {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border: 1px solid #e5e7eb;
+  }
+
+  .filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .filter-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  .filter-input {
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: border-color 0.2s;
+  }
+
+  .filter-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .search-bar {
+    position: relative;
+    grid-column: 1 / -1;
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 1rem;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6b7280;
+  }
+
+  .archive-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .stat-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+  }
+
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+
+  .stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #1f2937;
+    display: block;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .reports-container {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border: 1px solid #e5e7eb;
+  }
+
+  .reports-header {
+    background: linear-gradient(90deg, #f9fafb 0%, #f3f4f6 100%);
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .reports-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #1f2937;
+  }
+
+  .bulk-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .report-item {
+    border-bottom: 1px solid #f3f4f6;
+    padding: 1rem 1.5rem;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .report-item:hover {
+    background: #f9fafb;
+    transform: translateX(4px);
+  }
+
+  .report-item:last-child {
+    border-bottom: none;
+  }
+
+  .report-item.selected {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+  }
+
+  .report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+  }
+
+  .report-title {
+    font-weight: bold;
+    color: #1f2937;
+    margin-bottom: 0.25rem;
+    font-size: 1rem;
+  }
+
+  .report-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+    flex-wrap: wrap;
+  }
+
+  .report-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .report-content {
+    font-size: 0.875rem;
+    color: #374151;
+    line-height: 1.5;
+    margin-bottom: 0.75rem;
+  }
+
+  .report-tags {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: 1px solid transparent;
+  }
+
+  .tag-priority-critical { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+  .tag-priority-high { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+  .tag-priority-medium { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+  .tag-priority-low { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+
+  .tag-type-fire { background: #fef2f2; color: #991b1b; }
+  .tag-type-medical { background: #f0fdf4; color: #166534; }
+  .tag-type-flood { background: #ecfeff; color: #155e75; }
+  .tag-type-earthquake { background: #fef3c7; color: #92400e; }
+  .tag-type-accident { background: #fef3c7; color: #92400e; }
+  .tag-type-weather { background: #e0e7ff; color: #3730a3; }
+  .tag-type-general { background: #f3f4f6; color: #374151; }
+
+  .btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-small {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .btn-primary {
+    background: #2563eb;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary {
+    background: #6b7280;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #4b5563;
+    transform: translateY(-1px);
+  }
+
+  .btn-success {
+    background: #059669;
+    color: white;
+  }
+
+  .btn-success:hover {
+    background: #047857;
+    transform: translateY(-1px);
+  }
+
+  .btn-danger {
+    background: #dc2626;
+    color: white;
+  }
+
+  .btn-danger:hover {
+    background: #b91c1c;
+    transform: translateY(-1px);
+  }
+
+  .btn-outline {
+    background: transparent;
+    border: 1px solid #d1d5db;
+    color: #374151;
+  }
+
+  .btn-outline:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+    transform: translateY(-1px);
+  }
+
+  .checkbox-input {
+    margin-right: 0.5rem;
+    cursor: pointer;
+    transform: scale(1.1);
+  }
+
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 2rem;
+    padding: 1rem;
+  }
+
+  .page-btn {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+  }
+
+  .page-btn:hover {
+    background: #f9fafb;
+    transform: translateY(-1px);
+  }
+
+  .page-btn.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+  }
+
+  .page-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6b7280;
+  }
+
+  .empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    padding: 2rem;
+    overflow-y: auto;
+  }
+
+  .modal.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-content {
+    background: white;
+    border-radius: 12px;
+    max-width: 700px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 2rem;
+    position: relative;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .modal-title {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: #1f2937;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+    padding: 0;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  .close-btn:hover {
+    color: #374151;
+    background: #f3f4f6;
+  }
+
+  .loading-spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid #f3f4f6;
+    border-radius: 50%;
+    border-top-color: #3b82f6;
+    animation: spin 1s ease-in-out infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .status-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+  }
+
+  .status-pending { background: #f59e0b; }
+  .status-active { background: #3b82f6; }
+  .status-investigating { background: #8b5cf6; }
+  .status-resolved { background: #10b981; }
+  .status-archived { background: #6b7280; }
+
+  @media (max-width: 768px) {
+    .filter-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .archive-stats {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .report-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    
+    .report-actions {
+      width: 100%;
+      justify-content: flex-start;
+    }
+    
+    .bulk-actions {
+      flex-direction: column;
+    }
+
+    .breadcrumb-nav {
+      font-size: 0.75rem;
+      padding: 0.5rem;
+    }
+  }
+
+  [data-theme="dark"] .archive-controls,
+  [data-theme="dark"] .stat-card,
+  [data-theme="dark"] .reports-container,
+  [data-theme="dark"] .modal-content,
+  [data-theme="dark"] .breadcrumb-nav {
+    background: #374151;
+    border-color: #4b5563;
+    color: #f9fafb;
+  }
+
+  [data-theme="dark"] .reports-header {
+    background: linear-gradient(90deg, #4b5563 0%, #374151 100%);
+  }
+
+  [data-theme="dark"] .report-item:hover {
+    background: #4b5563;
+  }
+
+  [data-theme="dark"] .filter-input {
+    background: #4b5563;
+    border-color: #6b7280;
+    color: #f9fafb;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Navigation Breadcrumb -->
+<div class="breadcrumb-nav">
+  <nav>
+    <a href="/crisis-command-center">🧠 Crisis Command Center</a>
+    <span style="margin: 0 0.5rem;">›</span>
+    <a href="/admin">📊 Admin Dashboard</a>
+    <span style="margin: 0 0.5rem;">›</span>
+    <span>📚 Report Archive</span>
+  </nav>
+</div>
+
+<!-- Archive Controls -->
+<div class="archive-controls">
+  <div class="filter-grid">
+    <div class="search-bar">
+      <div class="search-icon">🔍</div>
+      <input type="text" class="search-input" id="searchInput" placeholder="Search reports by content, location, or reporter...">
+    </div>
+    
+    <div class="filter-group">
+      <label class="filter-label">Date Range</label>
+      <select class="filter-input" id="dateFilter">
+        <option value="all">All Time</option>
+        <option value="today">Today</option>
+        <option value="week">Last Week</option>
+        <option value="month">Last Month</option>
+        <option value="quarter">Last Quarter</option>
+        <option value="year">Last Year</option>
+      </select>
+    </div>
+    
+    <div class="filter-group">
+      <label class="filter-label">Report Type</label>
+      <select class="filter-input" id="typeFilter">
+        <option value="all">All Types</option>
+        <option value="fire">🔥 Fire Emergency</option>
+        <option value="medical">🚑 Medical Emergency</option>
+        <option value="flood">🌊 Flood/Water</option>
+        <option value="earthquake">📳 Earthquake/Seismic</option>
+        <option value="accident">🚗 Traffic Accident</option>
+        <option value="weather">⛈️ Weather Emergency</option>
+        <option value="security">🛡️ Security Incident</option>
+        <option value="infrastructure">🏗️ Infrastructure</option>
+        <option value="general">📋 General Emergency</option>
+      </select>
+    </div>
+    
+    <div class="filter-group">
+      <label class="filter-label">Priority</label>
+      <select class="filter-input" id="priorityFilter">
+        <option value="all">All Priorities</option>
+        <option value="critical">🔴 Critical</option>
+        <option value="high">🟠 High</option>
+        <option value="medium">🟡 Medium</option>
+        <option value="low">🟢 Low</option>
+      </select>
+    </div>
+    
+    <div class="filter-group">
+      <label class="filter-label">Status</label>
+      <select class="filter-input" id="statusFilter">
+        <option value="all">All Statuses</option>
+        <option value="pending">⏳ Pending</option>
+        <option value="active">🔵 Active</option>
+        <option value="investigating">🟣 Investigating</option>
+        <option value="resolved">✅ Resolved</option>
+        <option value="archived">📦 Archived</option>
+      </select>
+    </div>
+    
+    <div class="filter-group">
+      <label class="filter-label">Sort By</label>
+      <select class="filter-input" id="sortFilter">
+        <option value="date-desc">📅 Newest First</option>
+        <option value="date-asc">📅 Oldest First</option>
+        <option value="priority">🔥 Priority Level</option>
+        <option value="type">📋 Report Type</option>
+        <option value="status">📊 Status</option>
+      </select>
+    </div>
+  </div>
+  
+  <div style="display: flex; gap: 1rem; justify-content: space-between; align-items: center; margin-top: 1rem; flex-wrap: wrap;">
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+      <button class="btn btn-primary" onclick="exportSelected()" title="Export selected reports">
+        📤 Export Selected
+      </button>
+      <button class="btn btn-secondary" onclick="generateSummary()" title="Generate summary report">
+        📊 Generate Summary
+      </button>
+      <button class="btn btn-success" onclick="restoreSelected()" title="Restore selected archived reports">
+        ↩️ Restore Selected
+      </button>
+      <button class="btn btn-outline" onclick="clearFilters()" title="Clear all filters">
+        🗑️ Clear Filters
+      </button>
+    </div>
+    
+    <div style="font-size: 0.875rem; color: #6b7280;">
+      <span id="resultCount">0</span> reports found
+      <span id="loadingIndicator" style="display: none;">
+        <span class="loading-spinner"></span> Loading...
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Archive Statistics -->
+<div class="archive-stats">
+  <div class="stat-card">
+    <span class="stat-number" id="totalReports">0</span>
+    <span class="stat-label">Total Reports</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-number" id="thisWeek">0</span>
+    <span class="stat-label">This Week</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-number" id="criticalReports">0</span>
+    <span class="stat-label">Critical Priority</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-number" id="resolvedReports">0</span>
+    <span class="stat-label">Resolved</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-number" id="avgResponseTime">0</span>
+    <span class="stat-label">Avg Response (hrs)</span>
+  </div>
+</div>
+
+<!-- Reports List -->
+<div class="reports-container">
+  <div class="reports-header">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+      <input type="checkbox" class="checkbox-input" id="selectAll" onchange="toggleSelectAll()" title="Select all reports on this page">
+      <h3 class="reports-title">Archived Emergency Reports</h3>
+    </div>
+    
+    <div class="bulk-actions">
+      <button class="btn btn-small btn-secondary" onclick="bulkDownload()" title="Download selected reports">
+        💾 Download Selected
+      </button>
+      <button class="btn btn-small btn-success" onclick="bulkRestore()" title="Restore selected reports">
+        ↩️ Restore Selected
+      </button>
+      <button class="btn btn-small btn-danger" onclick="bulkDelete()" title="Permanently delete selected reports">
+        🗑️ Delete Selected
+      </button>
+    </div>
+  </div>
+  
+  <div id="reportsList">
+    <!-- Reports will be populated here -->
+  </div>
+  
+  <div class="pagination" id="pagination">
+    <!-- Pagination will be populated here -->
+  </div>
+</div>
+
+<!-- Report Detail Modal -->
+<div class="modal" id="reportModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 class="modal-title">Report Details</h3>
+      <button class="close-btn" onclick="closeModal()" title="Close modal">&times;</button>
+    </div>
+    <div id="modalContent">
+      <!-- Report details will be populated here -->
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+class ReportArchiveManager {
+  constructor() {
+    this.reports = [];
+    this.filteredReports = [];
+    this.selectedReports = new Set();
+    this.currentPage = 1;
+    this.reportsPerPage = 10;
+    this.isLoading = false;
+    
+    this.init();
+  }
+
+  init() {
+    this.loadReports();
+    this.setupEventListeners();
+  }
+
+  async loadReports() {
+    this.setLoading(true);
+    
+    try {
+      // First try to load from your API
+      const response = await fetch('/api/archived-reports?limit=1000');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.reports) {
+          this.reports = data.reports.map(report => ({
+            id: report.report_id || report.id,
+            title: report.title || `${report.type} - ${report.location}`,
+            type: this.extractTypeFromTitle(report.title || report.type) || 'general',
+            priority: report.priority,
+            status: report.status,
+            location: report.location,
+            timestamp: new Date(report.timestamp).getTime(),
+            reporter: report.reporter || 'Unknown',
+            description: report.description,
+            coordinates: report.latitude && report.longitude ? [report.latitude, report.longitude] : null,
+            attachments: report.has_evidence ? ['evidence_file'] : [],
+            responseTime: this.calculateResponseTime(report),
+            assignedTo: report.status !== 'pending' ? `Response Team ${Math.floor(Math.random() * 5) + 1}` : null,
+            method: report.method || 'text'
+          }));
+          
+          // Cache in localStorage as backup
+          localStorage.setItem('archivedReports', JSON.stringify(this.reports));
+          console.log(`✅ Loaded ${this.reports.length} reports from API`);
+        } else {
+          throw new Error('Invalid API response');
+        }
+      } else {
+        throw new Error('API request failed');
+      }
+    } catch (error) {
+      console.warn('Failed to load from API, using fallback data:', error);
+      
+      // Fallback to localStorage or demo data
+      const stored = localStorage.getItem('archivedReports');
+      if (stored) {
+        this.reports = JSON.parse(stored);
+        console.log(`📦 Loaded ${this.reports.length} reports from cache`);
+      } else {
+        this.reports = this.generateDemoReports();
+        localStorage.setItem('archivedReports', JSON.stringify(this.reports));
+        console.log(`🎭 Generated ${this.reports.length} demo reports`);
+      }
+    }
+    
+    this.filteredReports = [...this.reports];
+    this.setLoading(false);
+    this.updateStats();
+    this.renderReports();
+  }
+
+  calculateResponseTime(report) {
+    if (report.status === 'pending') return null;
+    // Calculate based on timestamps or return random for demo
+    return Math.floor(Math.random() * 24) + 1;
+  }
+
+  extractTypeFromTitle(title) {
+    if (!title) return 'general';
+    const titleLower = title.toLowerCase();
+    if (titleLower.includes('fire')) return 'fire';
+    if (titleLower.includes('medical') || titleLower.includes('ambulance')) return 'medical';
+    if (titleLower.includes('flood') || titleLower.includes('water')) return 'flood';
+    if (titleLower.includes('earthquake') || titleLower.includes('seismic')) return 'earthquake';
+    if (titleLower.includes('accident') || titleLower.includes('collision')) return 'accident';
+    if (titleLower.includes('weather') || titleLower.includes('storm')) return 'weather';
+    if (titleLower.includes('security')) return 'security';
+    if (titleLower.includes('infrastructure')) return 'infrastructure';
+    return 'general';
+  }
+
+  setLoading(loading) {
+    this.isLoading = loading;
+    const indicator = document.getElementById('loadingIndicator');
+    if (indicator) {
+      indicator.style.display = loading ? 'inline-block' : 'none';
+    }
+  }
+
+  generateDemoReports() {
+    const types = ['fire', 'medical', 'flood', 'earthquake', 'accident', 'weather', 'security', 'infrastructure', 'general'];
+    const priorities = ['critical', 'high', 'medium', 'low'];
+    const statuses = ['pending', 'active', 'investigating', 'resolved', 'archived'];
+    const locations = [
+      'Main St & 5th Ave', 'Central Park', 'Hospital District', 'Industrial Zone',
+      'River Road', 'Downtown Plaza', 'School District', 'Highway 101',
+      'Emergency Services Building', 'City Hall', 'Fire Station 7', 'Memorial Hospital'
+    ];
+
+    return Array.from({ length: 75 }, (_, i) => {
+      const type = types[Math.floor(Math.random() * types.length)];
+      const priority = priorities[Math.floor(Math.random() * priorities.length)];
+      const status = statuses[Math.floor(Math.random() * statuses.length)];
+      const location = locations[Math.floor(Math.random() * locations.length)];
+      const daysAgo = Math.floor(Math.random() * 180);
+      const timestamp = Date.now() - (daysAgo * 24 * 60 * 60 * 1000);
+
+      return {
+        id: `DEMO-${String(i + 1).padStart(3, '0')}`,
+        title: this.generateReportTitle(type),
+        type,
+        priority,
+        status,
+        location,
+        timestamp,
+        reporter: `User ${Math.floor(Math.random() * 100) + 1}`,
+        description: this.generateDescription(type, location),
+        coordinates: [37.7749 + (Math.random() - 0.5) * 0.1, -122.4194 + (Math.random() - 0.5) * 0.1],
+        attachments: Math.random() > 0.6 ? ['photo1.jpg', 'audio_note.mp3'] : [],
+        responseTime: status !== 'pending' ? Math.floor(Math.random() * 24) + 1 : null,
+        assignedTo: status !== 'pending' ? `Team ${Math.floor(Math.random() * 8) + 1}` : null,
+        method: Math.random() > 0.7 ? 'voice' : 'text'
+      };
+    });
+  }
+
+  generateReportTitle(type) {
+    const titles = {
+      fire: ['Building Fire Reported', 'Wildfire Spotted', 'Vehicle Fire Emergency', 'Smoke Investigation'],
+      medical: ['Medical Emergency Response', 'Accident Victim Treatment', 'Cardiac Event Response', 'Injured Person Assistance'],
+      flood: ['Street Flooding Alert', 'Flash Flood Warning', 'Water Main Break', 'Storm Drainage Issue'],
+      earthquake: ['Seismic Activity Report', 'Building Damage Assessment', 'Structural Inspection', 'Aftershock Monitoring'],
+      accident: ['Traffic Collision Response', 'Multi-Vehicle Accident', 'Pedestrian Incident', 'Highway Emergency'],
+      weather: ['Severe Weather Alert', 'High Wind Advisory', 'Storm Damage Report', 'Weather Emergency'],
+      security: ['Security Breach Report', 'Suspicious Activity', 'Unauthorized Access', 'Safety Concern'],
+      infrastructure: ['Power Outage Report', 'Water System Failure', 'Communication Breakdown', 'Infrastructure Damage'],
+      general: ['Emergency Situation', 'Public Safety Issue', 'Community Alert', 'Urgent Response Needed']
+    };
+    
+    const typeItems = titles[type] || titles.general;
+    return typeItems[Math.floor(Math.random() * typeItems.length)];
+  }
+
+  generateDescription(type, location) {
+    const descriptions = {
+      fire: `Fire emergency reported at ${location}. Visible flames and smoke observed. Fire department units dispatched immediately. Please avoid the area and follow evacuation procedures if necessary.`,
+      medical: `Medical emergency requiring immediate attention at ${location}. Ambulance and paramedic units have been dispatched. Patient condition being assessed on scene.`,
+      flood: `Flooding reported at ${location}. Water levels rising due to storm conditions. Road closures may be necessary. Monitor local alerts for safety updates.`,
+      earthquake: `Seismic activity detected in the ${location} area. Initial assessment for structural damage underway. Follow earthquake safety protocols and check for injuries.`,
+      accident: `Traffic accident reported at ${location}. Emergency services responding. Expect traffic delays and consider alternate routes. Scene being secured by police.`,
+      weather: `Severe weather conditions affecting ${location}. High winds and storm activity reported. Take shelter immediately and avoid unnecessary travel.`,
+      security: `Security incident reported at ${location}. Authorities investigating suspicious activity. Area being monitored for public safety. Report any unusual observations.`,
+      infrastructure: `Infrastructure failure reported at ${location}. Utility services may be affected. Repair crews have been notified and are responding to restore services.`,
+      general: `Emergency situation reported at ${location}. Response teams have been dispatched to assess and address the situation. Monitor official channels for updates.`
+    };
+    
+    return descriptions[type] || descriptions.general;
+  }
+
+  setupEventListeners() {
+    document.getElementById('searchInput').addEventListener('input', () => this.applyFilters());
+    document.getElementById('dateFilter').addEventListener('change', () => this.applyFilters());
+    document.getElementById('typeFilter').addEventListener('change', () => this.applyFilters());
+    document.getElementById('priorityFilter').addEventListener('change', () => this.applyFilters());
+    document.getElementById('statusFilter').addEventListener('change', () => this.applyFilters());
+    document.getElementById('sortFilter').addEventListener('change', () => this.applyFilters());
+  }
+
+  applyFilters() {
+    let filtered = [...this.reports];
+    
+    // Search filter
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    if (searchTerm) {
+      filtered = filtered.filter(report => 
+        report.title.toLowerCase().includes(searchTerm) ||
+        report.description.toLowerCase().includes(searchTerm) ||
+        report.location.toLowerCase().includes(searchTerm) ||
+        report.reporter.toLowerCase().includes(searchTerm) ||
+        report.id.toLowerCase().includes(searchTerm)
+      );
+    }
+    
+    // Date filter
+    const dateFilter = document.getElementById('dateFilter').value;
+    if (dateFilter !== 'all') {
+      const now = Date.now();
+      const cutoff = this.getDateCutoff(dateFilter, now);
+      filtered = filtered.filter(report => report.timestamp >= cutoff);
+    }
+    
+    // Type filter
+    const typeFilter = document.getElementById('typeFilter').value;
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(report => report.type === typeFilter);
+    }
+    
+    // Priority filter
+    const priorityFilter = document.getElementById('priorityFilter').value;
+    if (priorityFilter !== 'all') {
+      filtered = filtered.filter(report => report.priority === priorityFilter);
+    }
+    
+    // Status filter
+    const statusFilter = document.getElementById('statusFilter').value;
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(report => report.status === statusFilter);
+    }
+    
+    // Sort
+    const sortBy = document.getElementById('sortFilter').value;
+    filtered.sort((a, b) => this.sortReports(a, b, sortBy));
+    
+    this.filteredReports = filtered;
+    this.currentPage = 1;
+    this.selectedReports.clear();
+    this.updateResultCount();
+    this.renderReports();
+  }
+
+  getDateCutoff(filter, now) {
+    const day = 24 * 60 * 60 * 1000;
+    switch (filter) {
+      case 'today': return now - day;
+      case 'week': return now - (7 * day);
+      case 'month': return now - (30 * day);
+      case 'quarter': return now - (90 * day);
+      case 'year': return now - (365 * day);
+      default: return 0;
+    }
+  }
+
+  sortReports(a, b, sortBy) {
+    switch (sortBy) {
+      case 'date-desc': return b.timestamp - a.timestamp;
+      case 'date-asc': return a.timestamp - b.timestamp;
+      case 'priority': {
+        const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      }
+      case 'type': return a.type.localeCompare(b.type);
+      case 'status': return a.status.localeCompare(b.status);
+      default: return 0;
+    }
+  }
+
+  updateStats() {
+    const now = Date.now();
+    const week = 7 * 24 * 60 * 60 * 1000;
+    
+    document.getElementById('totalReports').textContent = this.reports.length;
+    document.getElementById('thisWeek').textContent = 
+      this.reports.filter(r => r.timestamp >= now - week).length;
+    document.getElementById('criticalReports').textContent = 
+      this.reports.filter(r => r.priority === 'critical').length;
+    document.getElementById('resolvedReports').textContent = 
+      this.reports.filter(r => r.status === 'resolved').length;
+    
+    const responseTimes = this.reports.filter(r => r.responseTime !== null).map(r => r.responseTime);
+    const avgResponse = responseTimes.length > 0 ? 
+      Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length) : 0;
+    document.getElementById('avgResponseTime').textContent = avgResponse;
+  }
+
+  updateResultCount() {
+    document.getElementById('resultCount').textContent = this.filteredReports.length;
+  }
+
+  renderReports() {
+    const container = document.getElementById('reportsList');
+    const startIndex = (this.currentPage - 1) * this.reportsPerPage;
+    const endIndex = startIndex + this.reportsPerPage;
+    const pageReports = this.filteredReports.slice(startIndex, endIndex);
+    
+    if (pageReports.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">📭</div>
+          <h3>No reports found</h3>
+          <p>Try adjusting your search criteria or filters.</p>
+          <button class="btn btn-outline" onclick="clearFilters()" style="margin-top: 1rem;">
+            🗑️ Clear All Filters
+          </button>
+        </div>
+      `;
+      this.renderPagination();
+      return;
+    }
+    
+    container.innerHTML = pageReports.map(report => this.renderReportItem(report)).join('');
+    this.renderPagination();
+    this.updateSelectAllCheckbox();
+  }
+
+  renderReportItem(report) {
+    const isSelected = this.selectedReports.has(report.id);
+    const typeIcon = this.getTypeIcon(report.type);
+    const priorityClass = `tag-priority-${report.priority}`;
+    const typeClass = `tag-type-${report.type}`;
+    const statusIndicator = `status-${report.status}`;
+    
+    return `
+      <div class="report-item ${isSelected ? 'selected' : ''}" data-id="${report.id}">
+        <div class="report-header">
+          <div style="flex: 1;">
+            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+              <input type="checkbox" class="checkbox-input" ${isSelected ? 'checked' : ''} 
+                     onchange="toggleReportSelection('${report.id}')" title="Select this report">
+              <span class="report-title">${typeIcon} ${report.title}</span>
+              <span class="status-indicator ${statusIndicator}" title="Status: ${report.status}"></span>
+            </div>
+            <div class="report-meta">
+              <span title="Report Date">📅 ${new Date(report.timestamp).toLocaleDateString()}</span>
+              <span title="Location">📍 ${report.location}</span>
+              <span title="Reporter">👤 ${report.reporter}</span>
+              <span title="Report ID">🆔 ${report.id}</span>
+              ${report.assignedTo ? `<span title="Assigned Team">👥 ${report.assignedTo}</span>` : ''}
+              ${report.responseTime ? `<span title="Response Time">⏱️ ${report.responseTime}h response</span>` : ''}
+              ${report.method === 'voice' ? '<span title="Voice Report">🎤 Voice</span>' : ''}
+            </div>
+          </div>
+          
+          <div class="report-actions">
+            <button class="btn btn-small btn-outline" onclick="viewReport('${report.id}')" title="View full report details">
+              👁️ View
+            </button>
+            <button class="btn btn-small btn-secondary" onclick="downloadReport('${report.id}')" title="Download report data">
+              💾 Download
+            </button>
+            <button class="btn btn-small btn-success" onclick="restoreReport('${report.id}')" title="Restore this report to active status">
+              ↩️ Restore
+            </button>
+            <button class="btn btn-small btn-danger" onclick="deleteReport('${report.id}')" title="Permanently delete this report">
+              🗑️ Delete
+            </button>
+          </div>
+        </div>
+        
+        <div class="report-content">
+          ${report.description.length > 200 ? report.description.substring(0, 200) + '...' : report.description}
+          ${report.attachments.length > 0 ? `<br><strong>📎 Attachments:</strong> ${report.attachments.join(', ')}` : ''}
+        </div>
+        
+        <div class="report-tags">
+          <span class="tag ${priorityClass}" title="Priority Level">${report.priority.toUpperCase()}</span>
+          <span class="tag ${typeClass}" title="Report Type">${report.type.toUpperCase()}</span>
+          <span class="tag" style="background: #f3f4f6; color: #374151;" title="Current Status">${report.status.toUpperCase()}</span>
+          ${report.coordinates ? '<span class="tag" style="background: #ecfdf5; color: #166534;" title="GPS Coordinates Available">📍 GPS</span>' : ''}
+          ${report.attachments.length > 0 ? '<span class="tag" style="background: #fef3c7; color: #92400e;" title="Has Attachments">📎 Files</span>' : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  renderPagination() {
+    const container = document.getElementById('pagination');
+    const totalPages = Math.ceil(this.filteredReports.length / this.reportsPerPage);
+    
+    if (totalPages <= 1) {
+      container.innerHTML = '';
+      return;
+    }
+    
+    let pagination = `
+      <button class="page-btn" ${this.currentPage === 1 ? 'disabled' : ''} 
+              onclick="archiveManager.goToPage(${this.currentPage - 1})" title="Previous page">
+        ← Previous
+      </button>
+    `;
+    
+    // Show page numbers
+    const start = Math.max(1, this.currentPage - 2);
+    const end = Math.min(totalPages, this.currentPage + 2);
+    
+    if (start > 1) {
+      pagination += `<button class="page-btn" onclick="archiveManager.goToPage(1)" title="First page">1</button>`;
+      if (start > 2) pagination += `<span style="padding: 0.5rem;">...</span>`;
+    }
+    
+    for (let i = start; i <= end; i++) {
+      pagination += `
+        <button class="page-btn ${i === this.currentPage ? 'active' : ''}" 
+                onclick="archiveManager.goToPage(${i})" title="Page ${i}">
+          ${i}
+        </button>
+      `;
+    }
+    
+    if (end < totalPages) {
+      if (end < totalPages - 1) pagination += `<span style="padding: 0.5rem;">...</span>`;
+      pagination += `<button class="page-btn" onclick="archiveManager.goToPage(${totalPages})" title="Last page">${totalPages}</button>`;
+    }
+    
+    pagination += `
+      <button class="page-btn" ${this.currentPage === totalPages ? 'disabled' : ''} 
+              onclick="archiveManager.goToPage(${this.currentPage + 1})" title="Next page">
+        Next →
+      </button>
+    `;
+    
+    container.innerHTML = pagination;
+  }
+
+  goToPage(page) {
+    this.currentPage = page;
+    this.renderReports();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  getTypeIcon(type) {
+    const icons = {
+      fire: '🔥',
+      medical: '🚑',
+      flood: '🌊',
+      earthquake: '📳',
+      accident: '🚗',
+      weather: '⛈️',
+      security: '🛡️',
+      infrastructure: '🏗️',
+      general: '📋'
+    };
+    return icons[type] || '📋';
+  }
+
+  toggleReportSelection(reportId) {
+    if (this.selectedReports.has(reportId)) {
+      this.selectedReports.delete(reportId);
+    } else {
+      this.selectedReports.add(reportId);
+    }
+    
+    this.renderReports();
+  }
+
+  toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll').checked;
+    const pageReports = this.getCurrentPageReports();
+    
+    if (selectAll) {
+      pageReports.forEach(report => this.selectedReports.add(report.id));
+    } else {
+      pageReports.forEach(report => this.selectedReports.delete(report.id));
+    }
+    
+    this.renderReports();
+  }
+
+  updateSelectAllCheckbox() {
+    const selectAll = document.getElementById('selectAll');
+    const pageReports = this.getCurrentPageReports();
+    const selectedOnPage = pageReports.filter(report => this.selectedReports.has(report.id));
+    
+    if (selectedOnPage.length === 0) {
+      selectAll.checked = false;
+      selectAll.indeterminate = false;
+    } else if (selectedOnPage.length === pageReports.length) {
+      selectAll.checked = true;
+      selectAll.indeterminate = false;
+    } else {
+      selectAll.checked = false;
+      selectAll.indeterminate = true;
+    }
+  }
+
+  getCurrentPageReports() {
+    const startIndex = (this.currentPage - 1) * this.reportsPerPage;
+    const endIndex = startIndex + this.reportsPerPage;
+    return this.filteredReports.slice(startIndex, endIndex);
+  }
+
+  viewReport(reportId) {
+    const report = this.reports.find(r => r.id === reportId);
+    if (!report) return;
+    
+    const modal = document.getElementById('reportModal');
+    const content = document.getElementById('modalContent');
+    
+    content.innerHTML = `
+      <div style="margin-bottom: 1.5rem;">
+        <h4 style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+          ${this.getTypeIcon(report.type)} ${report.title}
+        </h4>
+        <div style="display: flex; gap: 0.5rem; margin: 0.5rem 0; flex-wrap: wrap;">
+          <span class="tag tag-priority-${report.priority}">${report.priority.toUpperCase()}</span>
+          <span class="tag tag-type-${report.type}">${report.type.toUpperCase()}</span>
+          <span class="tag" style="background: #f3f4f6; color: #374151;">${report.status.toUpperCase()}</span>
+          ${report.method === 'voice' ? '<span class="tag" style="background: #ddd6fe; color: #5b21b6;">🎤 VOICE</span>' : ''}
+        </div>
+      </div>
+      
+      <div style="margin-bottom: 1.5rem; line-height: 1.6;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+          <div><strong>📅 Date:</strong><br>${new Date(report.timestamp).toLocaleString()}</div>
+          <div><strong>📍 Location:</strong><br>${report.location}</div>
+          <div><strong>👤 Reporter:</strong><br>${report.reporter}</div>
+          <div><strong>🆔 Report ID:</strong><br>${report.id}</div>
+        </div>
+        
+        ${report.assignedTo ? `<div style="margin-bottom: 0.5rem;"><strong>👥 Assigned to:</strong> ${report.assignedTo}</div>` : ''}
+        ${report.responseTime ? `<div style="margin-bottom: 0.5rem;"><strong>⏱️ Response Time:</strong> ${report.responseTime} hours</div>` : ''}
+        ${report.coordinates ? `<div style="margin-bottom: 0.5rem;"><strong>🗺️ Coordinates:</strong> ${report.coordinates[0].toFixed(6)}, ${report.coordinates[1].toFixed(6)}</div>` : ''}
+      </div>
+      
+      <div style="margin-bottom: 1.5rem;">
+        <strong>📝 Full Description:</strong>
+        <div style="background: #f9fafb; padding: 1rem; border-radius: 8px; margin-top: 0.5rem; border-left: 4px solid #3b82f6;">
+          ${report.description}
+        </div>
+      </div>
+      
+      ${report.attachments.length > 0 ? `
+        <div style="margin-bottom: 1.5rem;">
+          <strong>📎 Attachments:</strong>
+          <div style="margin-top: 0.5rem;">
+            ${report.attachments.map(file => `
+              <div style="background: #f3f4f6; padding: 0.75rem; border-radius: 6px; margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span>📄</span>
+                <span style="font-family: monospace;">${file}</span>
+                <button class="btn btn-small btn-outline" style="margin-left: auto;">📥 Download</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+      
+      <div style="display: flex; gap: 0.5rem; margin-top: 2rem; flex-wrap: wrap;">
+        <button class="btn btn-primary" onclick="downloadReport('${report.id}')" title="Download full report">
+          💾 Download Report
+        </button>
+        <button class="btn btn-success" onclick="restoreReport('${report.id}')" title="Restore to active status">
+          ↩️ Restore Report
+        </button>
+        <button class="btn btn-secondary" onclick="copyReportData('${report.id}')" title="Copy report data to clipboard">
+          📋 Copy Data
+        </button>
+        <button class="btn btn-outline" onclick="closeModal()" title="Close this dialog">
+          ❌ Close
+        </button>
+      </div>
+    `;
+    
+    modal.classList.add('show');
+  }
+
+  async downloadReport(reportId) {
+    const report = this.reports.find(r => r.id === reportId);
+    if (!report) return;
+    
+    // Create comprehensive downloadable report data
+    const reportData = {
+      report_metadata: {
+        id: report.id,
+        title: report.title,
+        generated_at: new Date().toISOString(),
+        format_version: "2.0"
+      },
+      incident_details: {
+        type: report.type,
+        priority: report.priority,
+        status: report.status,
+        method: report.method,
+        timestamp: new Date(report.timestamp).toISOString(),
+        location: {
+          description: report.location,
+          coordinates: report.coordinates ? {
+            latitude: report.coordinates[0],
+            longitude: report.coordinates[1]
+          } : null
+        }
+      },
+      personnel: {
+        reporter: report.reporter,
+        assigned_to: report.assignedTo,
+        response_time_hours: report.responseTime
+      },
+      content: {
+        description: report.description,
+        attachments: report.attachments
+      },
+      export_info: {
+        exported_by: "Archive System",
+        exported_at: new Date().toISOString(),
+        source: "Emergency Response Archive"
+      }
+    };
+    
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `emergency-report-${report.id}-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    console.log(`📥 Downloaded report: ${report.id}`);
+  }
+
+  async restoreReport(reportId) {
+    if (confirm('Are you sure you want to restore this report to active status? It will be moved out of the archive.')) {
+      try {
+        const response = await fetch(`/api/restore-report/${reportId}`, { 
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            alert('✅ Report restored successfully!');
+            // Remove from local reports list
+            this.reports = this.reports.filter(r => r.id !== reportId);
+            this.selectedReports.delete(reportId);
+            localStorage.setItem('archivedReports', JSON.stringify(this.reports));
+            this.applyFilters();
+            this.updateStats();
+            closeModal();
+          } else {
+            throw new Error(data.error || 'Restore failed');
+          }
+        } else {
+          throw new Error('Network error');
+        }
+      } catch (error) {
+        console.error('Restore error:', error);
+        alert('❌ Failed to restore report: ' + error.message);
+      }
+    }
+  }
+
+  async deleteReport(reportId) {
+    if (confirm('⚠️ Are you sure you want to PERMANENTLY DELETE this report? This action cannot be undone and will remove all associated data.')) {
+      try {
+        // Try API call first
+        const response = await fetch(`/api/delete-report/${reportId}`, { 
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok || response.status === 404) {
+          // Remove from local storage whether API call succeeded or not
+          this.reports = this.reports.filter(r => r.id !== reportId);
+          this.selectedReports.delete(reportId);
+          localStorage.setItem('archivedReports', JSON.stringify(this.reports));
+          this.applyFilters();
+          this.updateStats();
+          
+          console.log(`🗑️ Deleted report: ${reportId}`);
+          closeModal();
+        } else {
+          throw new Error('Failed to delete from server');
+        }
+      } catch (error) {
+        console.warn('API delete failed, removing locally:', error);
+        // Fallback: remove locally even if API fails
+        this.reports = this.reports.filter(r => r.id !== reportId);
+        this.selectedReports.delete(reportId);
+        localStorage.setItem('archivedReports', JSON.stringify(this.reports));
+        this.applyFilters();
+        this.updateStats();
+        closeModal();
+      }
+    }
+  }
+
+  copyReportData(reportId) {
+    const report = this.reports.find(r => r.id === reportId);
+    if (!report) return;
+    
+    const textData = `
+EMERGENCY REPORT - ${report.id}
+${report.title}
+${'='.repeat(50)}
+
+📋 BASIC INFORMATION
+Type: ${report.type.toUpperCase()}
+Priority: ${report.priority.toUpperCase()}
+Status: ${report.status.toUpperCase()}
+Method: ${report.method.toUpperCase()}
+
+📅 TIMELINE
+Reported: ${new Date(report.timestamp).toLocaleString()}
+${report.responseTime ? `Response Time: ${report.responseTime} hours` : ''}
+
+📍 LOCATION
+${report.location}
+${report.coordinates ? `Coordinates: ${report.coordinates[0].toFixed(6)}, ${report.coordinates[1].toFixed(6)}` : ''}
+
+👤 PERSONNEL
+Reporter: ${report.reporter}
+${report.assignedTo ? `Assigned to: ${report.assignedTo}` : ''}
+
+📝 DESCRIPTION
+${report.description}
+
+${report.attachments.length > 0 ? `📎 ATTACHMENTS\n${report.attachments.join('\n')}` : ''}
+
+${'='.repeat(50)}
+Exported from Emergency Response Archive System
+Export Date: ${new Date().toLocaleString()}
+    `.trim();
+    
+    navigator.clipboard.writeText(textData).then(() => {
+      alert('📋 Report data copied to clipboard!');
+    }).catch(err => {
+      console.error('Copy failed:', err);
+      alert('❌ Failed to copy to clipboard');
+    });
+  }
+}
+
+// Global functions
+let archiveManager;
+
+function toggleReportSelection(reportId) {
+  if (archiveManager) {
+    archiveManager.toggleReportSelection(reportId);
+  }
+}
+
+function toggleSelectAll() {
+  if (archiveManager) {
+    archiveManager.toggleSelectAll();
+  }
+}
+
+function viewReport(reportId) {
+  if (archiveManager) {
+    archiveManager.viewReport(reportId);
+  }
+}
+
+function downloadReport(reportId) {
+  if (archiveManager) {
+    archiveManager.downloadReport(reportId);
+  }
+}
+
+function restoreReport(reportId) {
+  if (archiveManager) {
+    archiveManager.restoreReport(reportId);
+  }
+}
+
+function deleteReport(reportId) {
+  if (archiveManager) {
+    archiveManager.deleteReport(reportId);
+  }
+}
+
+function copyReportData(reportId) {
+  if (archiveManager) {
+    archiveManager.copyReportData(reportId);
+  }
+}
+
+function closeModal() {
+  document.getElementById('reportModal').classList.remove('show');
+}
+
+function clearFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('dateFilter').value = 'all';
+  document.getElementById('typeFilter').value = 'all';
+  document.getElementById('priorityFilter').value = 'all';
+  document.getElementById('statusFilter').value = 'all';
+  document.getElementById('sortFilter').value = 'date-desc';
+  
+  if (archiveManager) {
+    archiveManager.applyFilters();
+  }
+}
+
+function exportSelected() {
+  if (!archiveManager || archiveManager.selectedReports.size === 0) {
+    alert('Please select reports to export.');
+    return;
+  }
+  
+  const selectedData = archiveManager.reports.filter(r => 
+    archiveManager.selectedReports.has(r.id)
+  );
+  
+  const exportData = {
+    export_metadata: {
+      exported_at: new Date().toISOString(),
+      export_type: "batch_archive_export",
+      total_reports: selectedData.length,
+      exported_by: "Archive System"
+    },
+    reports: selectedData
+  };
+  
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `emergency-reports-export-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  
+  console.log(`📤 Exported ${selectedData.length} reports`);
+}
+
+function restoreSelected() {
+  if (!archiveManager || archiveManager.selectedReports.size === 0) {
+    alert('Please select reports to restore.');
+    return;
+  }
+  
+  const count = archiveManager.selectedReports.size;
+  if (confirm(`Are you sure you want to restore ${count} selected reports? They will be moved out of the archive and back to active status.`)) {
+    let successCount = 0;
+    let failCount = 0;
+    
+    archiveManager.selectedReports.forEach(async (reportId) => {
+      try {
+        const response = await fetch(`/api/restore-report/${reportId}`, { method: 'POST' });
+        if (response.ok) {
+          successCount++;
+          archiveManager.reports = archiveManager.reports.filter(r => r.id !== reportId);
+        } else {
+          failCount++;
+        }
+      } catch (error) {
+        failCount++;
+      }
+      
+      // Update UI after all attempts
+      if (successCount + failCount === count) {
+        archiveManager.selectedReports.clear();
+        localStorage.setItem('archivedReports', JSON.stringify(archiveManager.reports));
+        archiveManager.applyFilters();
+        archiveManager.updateStats();
+        
+        if (failCount === 0) {
+          alert(`✅ Successfully restored ${successCount} reports!`);
+        } else {
+          alert(`⚠️ Restored ${successCount} reports, ${failCount} failed. Check console for details.`);
+        }
+      }
+    });
+  }
+}
+
+function generateSummary() {
+  if (!archiveManager) return;
+  
+  const reports = archiveManager.filteredReports;
+  const summary = {
+    totalReports: reports.length,
+    byType: {},
+    byPriority: {},
+    byStatus: {},
+    timeRange: {
+      earliest: null,
+      latest: null
+    },
+    avgResponseTime: 0,
+    totalWithResponse: 0
+  };
+  
+  // Calculate statistics
+  reports.forEach(report => {
+    // Count by type
+    summary.byType[report.type] = (summary.byType[report.type] || 0) + 1;
+    
+    // Count by priority
+    summary.byPriority[report.priority] = (summary.byPriority[report.priority] || 0) + 1;
+    
+    // Count by status
+    summary.byStatus[report.status] = (summary.byStatus[report.status] || 0) + 1;
+    
+    // Track time range
+    if (!summary.timeRange.earliest || report.timestamp < summary.timeRange.earliest) {
+      summary.timeRange.earliest = report.timestamp;
+    }
+    if (!summary.timeRange.latest || report.timestamp > summary.timeRange.latest) {
+      summary.timeRange.latest = report.timestamp;
+    }
+    
+    // Calculate average response time
+    if (report.responseTime) {
+      summary.avgResponseTime += report.responseTime;
+      summary.totalWithResponse++;
+    }
+  });
+  
+  if (summary.totalWithResponse > 0) {
+    summary.avgResponseTime = Math.round(summary.avgResponseTime / summary.totalWithResponse * 100) / 100;
+  }
+  
+  // Generate summary report
+  const summaryContent = `
+    <div style="margin-bottom: 2rem;">
+      <h4 style="margin-bottom: 1rem; color: #1f2937;">📊 Archive Summary Report</h4>
+      <div style="background: #f9fafb; padding: 1rem; border-radius: 8px; border-left: 4px solid #3b82f6;">
+        Generated on ${new Date().toLocaleString()}<br>
+        ${summary.totalReports} reports analyzed
+        ${summary.timeRange.earliest && summary.timeRange.latest ? 
+          `<br>Date range: ${new Date(summary.timeRange.earliest).toLocaleDateString()} - ${new Date(summary.timeRange.latest).toLocaleDateString()}` 
+          : ''}
+      </div>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+      <div style="background: white; padding: 1.5rem; border-radius: 8px; border: 1px solid #e5e7eb;">
+        <h5 style="margin-bottom: 1rem; color: #374151;">🗂️ Reports by Type</h5>
+        ${Object.entries(summary.byType).map(([type, count]) => 
+          `<div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+            <span>${archiveManager.getTypeIcon(type)} ${type.charAt(0).toUpperCase() + type.slice(1)}</span>
+            <strong>${count}</strong>
+          </div>`
+        ).join('')}
+      </div>
+      
+      <div style="background: white; padding: 1.5rem; border-radius: 8px; border: 1px solid #e5e7eb;">
+        <h5 style="margin-bottom: 1rem; color: #374151;">🚨 Reports by Priority</h5>
+        ${Object.entries(summary.byPriority).map(([priority, count]) => 
+          `<div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+            <span class="tag tag-priority-${priority}" style="margin-right: 0.5rem;">${priority.toUpperCase()}</span>
+            <strong>${count}</strong>
+          </div>`
+        ).join('')}
+      </div>
+      
+      <div style="background: white; padding: 1.5rem; border-radius: 8px; border: 1px solid #e5e7eb;">
+        <h5 style="margin-bottom: 1rem; color: #374151;">📈 Reports by Status</h5>
+        ${Object.entries(summary.byStatus).map(([status, count]) => 
+          `<div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+            <span><span class="status-indicator status-${status}"></span>${status.charAt(0).toUpperCase() + status.slice(1)}</span>
+            <strong>${count}</strong>
+          </div>`
+        ).join('')}
+      </div>
+    </div>
+    
+    <div style="background: white; padding: 1.5rem; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 2rem;">
+      <h5 style="margin-bottom: 1rem; color: #374151;">📊 Key Metrics</h5>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div style="text-align: center; padding: 1rem; background: #f9fafb; border-radius: 6px;">
+          <div style="font-size: 2rem; font-weight: bold; color: #1f2937;">${summary.totalReports}</div>
+          <div style="font-size: 0.875rem; color: #6b7280;">Total Reports</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: #f9fafb; border-radius: 6px;">
+          <div style="font-size: 2rem; font-weight: bold; color: #1f2937;">${summary.avgResponseTime}h</div>
+          <div style="font-size: 0.875rem; color: #6b7280;">Avg Response Time</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: #f9fafb; border-radius: 6px;">
+          <div style="font-size: 2rem; font-weight: bold; color: #1f2937;">${summary.byStatus.resolved || 0}</div>
+          <div style="font-size: 0.875rem; color: #6b7280;">Resolved Cases</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: #f9fafb; border-radius: 6px;">
+          <div style="font-size: 2rem; font-weight: bold; color: #1f2937;">${Math.round((summary.byStatus.resolved || 0) / summary.totalReports * 100)}%</div>
+          <div style="font-size: 0.875rem; color: #6b7280;">Resolution Rate</div>
+        </div>
+      </div>
+    </div>
+    
+    <div style="display: flex; gap: 0.5rem; margin-top: 2rem; flex-wrap: wrap;">
+      <button class="btn btn-primary" onclick="downloadSummary()" title="Download summary as JSON">
+        💾 Download Summary
+      </button>
+      <button class="btn btn-secondary" onclick="copySummaryText()" title="Copy summary text to clipboard">
+        📋 Copy Summary
+      </button>
+      <button class="btn btn-outline" onclick="closeModal()" title="Close this dialog">
+        ❌ Close
+      </button>
+    </div>
+  `;
+  
+  const modal = document.getElementById('reportModal');
+  const content = document.getElementById('modalContent');
+  
+  content.innerHTML = summaryContent;
+  modal.classList.add('show');
+  
+  // Store summary data for download
+  window.currentSummaryData = summary;
+}
+
+function downloadSummary() {
+  if (!window.currentSummaryData) return;
+  
+  const summaryData = {
+    summary_metadata: {
+      generated_at: new Date().toISOString(),
+      report_type: "archive_summary",
+      total_reports_analyzed: window.currentSummaryData.totalReports
+    },
+    statistics: window.currentSummaryData,
+    filters_applied: {
+      search: document.getElementById('searchInput').value || 'none',
+      date_range: document.getElementById('dateFilter').value,
+      type: document.getElementById('typeFilter').value,
+      priority: document.getElementById('priorityFilter').value,
+      status: document.getElementById('statusFilter').value,
+      sort_by: document.getElementById('sortFilter').value
+    },
+    export_info: {
+      exported_by: "Archive System",
+      exported_at: new Date().toISOString(),
+      source: "Emergency Response Archive"
+    }
+  };
+  
+  const blob = new Blob([JSON.stringify(summaryData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `archive-summary-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  
+  console.log('📊 Downloaded summary report');
+}
+
+function copySummaryText() {
+  if (!window.currentSummaryData) return;
+  
+  const summary = window.currentSummaryData;
+  const textSummary = `
+EMERGENCY RESPONSE ARCHIVE SUMMARY
+${'='.repeat(50)}
+
+📊 OVERVIEW
+Total Reports: ${summary.totalReports}
+${summary.timeRange.earliest && summary.timeRange.latest ? 
+  `Time Range: ${new Date(summary.timeRange.earliest).toLocaleDateString()} - ${new Date(summary.timeRange.latest).toLocaleDateString()}` 
+  : ''}
+Average Response Time: ${summary.avgResponseTime} hours
+Resolution Rate: ${Math.round((summary.byStatus.resolved || 0) / summary.totalReports * 100)}%
+
+🗂️ REPORTS BY TYPE
+${Object.entries(summary.byType).map(([type, count]) => 
+  `${type.charAt(0).toUpperCase() + type.slice(1)}: ${count}`
+).join('\n')}
+
+🚨 REPORTS BY PRIORITY
+${Object.entries(summary.byPriority).map(([priority, count]) => 
+  `${priority.toUpperCase()}: ${count}`
+).join('\n')}
+
+📈 REPORTS BY STATUS
+${Object.entries(summary.byStatus).map(([status, count]) => 
+  `${status.charAt(0).toUpperCase() + status.slice(1)}: ${count}`
+).join('\n')}
+
+${'='.repeat(50)}
+Generated: ${new Date().toLocaleString()}
+Source: Emergency Response Archive System
+  `.trim();
+  
+  navigator.clipboard.writeText(textSummary).then(() => {
+    alert('📋 Summary copied to clipboard!');
+  }).catch(err => {
+    console.error('Copy failed:', err);
+    alert('❌ Failed to copy to clipboard');
+  });
+}
+
+function bulkDownload() {
+  if (!archiveManager || archiveManager.selectedReports.size === 0) {
+    alert('Please select reports to download.');
+    return;
+  }
+  
+  exportSelected(); // Reuse the existing export functionality
+}
+
+function bulkRestore() {
+  if (!archiveManager || archiveManager.selectedReports.size === 0) {
+    alert('Please select reports to restore.');
+    return;
+  }
+  
+  restoreSelected(); // Reuse the existing restore functionality
+}
+
+function bulkDelete() {
+  if (!archiveManager || archiveManager.selectedReports.size === 0) {
+    alert('Please select reports to delete.');
+    return;
+  }
+  
+  const count = archiveManager.selectedReports.size;
+  if (confirm(`⚠️ Are you sure you want to PERMANENTLY DELETE ${count} selected reports? This action cannot be undone and will remove all associated data.`)) {
+    if (confirm(`🚨 FINAL WARNING: This will permanently delete ${count} reports. Type 'DELETE' in the next prompt to confirm.`)) {
+      const confirmation = prompt('Type DELETE to confirm permanent deletion:');
+      if (confirmation === 'DELETE') {
+        let deleteCount = 0;
+        const totalToDelete = archiveManager.selectedReports.size;
+        
+        archiveManager.selectedReports.forEach(async (reportId) => {
+          try {
+            const response = await fetch(`/api/delete-report/${reportId}`, { method: 'DELETE' });
+            // Continue with deletion regardless of API response
+            archiveManager.reports = archiveManager.reports.filter(r => r.id !== reportId);
+            deleteCount++;
+            
+            if (deleteCount === totalToDelete) {
+              // All deletions complete
+              archiveManager.selectedReports.clear();
+              localStorage.setItem('archivedReports', JSON.stringify(archiveManager.reports));
+              archiveManager.applyFilters();
+              archiveManager.updateStats();
+              alert(`🗑️ Successfully deleted ${deleteCount} reports.`);
+            }
+          } catch (error) {
+            console.warn(`Failed to delete ${reportId}:`, error);
+            // Still remove locally
+            archiveManager.reports = archiveManager.reports.filter(r => r.id !== reportId);
+            deleteCount++;
+            
+            if (deleteCount === totalToDelete) {
+              archiveManager.selectedReports.clear();
+              localStorage.setItem('archivedReports', JSON.stringify(archiveManager.reports));
+              archiveManager.applyFilters();
+              archiveManager.updateStats();
+              alert(`🗑️ Deleted ${deleteCount} reports (some API calls failed but reports removed locally).`);
+            }
+          }
+        });
+      } else {
+        alert('Deletion cancelled - confirmation text did not match.');
+      }
+    }
+  }
+}
+
+// Initialize the archive manager when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+  archiveManager = new ReportArchiveManager();
+  
+  // Set up modal close on outside click
+  document.getElementById('reportModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+      closeModal();
+    }
+  });
+  
+  // Set up keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    // Escape key to close modal
+    if (e.key === 'Escape') {
+      closeModal();
+    }
+    
+    // Ctrl+A to select all (when not in input field)
+    if (e.ctrlKey && e.key === 'a' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+      e.preventDefault();
+      document.getElementById('selectAll').checked = true;
+      toggleSelectAll();
+    }
+    
+    // Delete key to delete selected reports (when not in input field)
+    if (e.key === 'Delete' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+      if (archiveManager && archiveManager.selectedReports.size > 0) {
+        bulkDelete();
+      }
+    }
+  });
+  
+  console.log('📚 Archive Manager initialized successfully');
+});
+</script>
+{% endblock %}
+
+
+
+
+
+

@@ -1,0 +1,1303 @@
+{% extends "base.html" %}
+
+{% block title %}My Emergency Reports - Track Your Submissions{% endblock %}
+{% block page_title %}📋 My Emergency Reports{% endblock %}
+{% block subtitle %}Track the status of your submitted reports and view community updates{% endblock %}
+
+{% block header_actions %}
+<nav class="nav-links">
+    <a href="/" class="btn-primary" style="text-decoration: none;">🏠 Back to Home</a>
+    <a href="/submit-report" class="btn-secondary" style="text-decoration: none;">🚨 New Report</a>
+    <a href="/voice-emergency-reporter" class="btn-primary" style="text-decoration: none;">🎤 Voice Report</a>
+    <button class="btn-primary" onclick="refreshReports()" title="Refresh Reports">🔄 Refresh</button>
+    <button class="btn-primary" onclick="exportAllReports()" title="Export All Reports">💾 Export</button>
+</nav>
+{% endblock %}
+
+{% block extra_css %}
+{{ super() }}
+<style>
+    /* Dashboard Layout - Using Base.html Design System */
+    .dashboard-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0;
+    }
+
+    .dashboard-content {
+        background: var(--surface-gradient);
+        border-radius: var(--radius-xl);
+        padding: 2rem;
+        box-shadow: var(--card-shadow);
+        border: 1px solid var(--border-subtle);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .dashboard-content::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: 
+            radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    .dashboard-content > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid var(--border-subtle);
+    }
+
+    .dashboard-title {
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .dashboard-subtitle {
+        color: var(--text-secondary);
+        margin: 0.5rem 0 0 0;
+    }
+
+    .dashboard-actions {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    /* Navigation Links Styling */
+    .nav-links {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .nav-links .btn-primary,
+    .nav-links .btn-secondary {
+        font-size: 0.875rem;
+        padding: 0.625rem 1rem;
+        border-radius: var(--radius);
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    /* Statistics Cards - Using Base.html Color System */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: var(--bg-primary);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        border: 1px solid var(--border-subtle);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        box-shadow: var(--card-shadow);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        border-color: var(--color-primary-300);
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--color-primary-500) 0%, var(--color-success-500) 100%);
+    }
+
+    .stat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .stat-icon {
+        font-size: 2rem;
+        opacity: 0.8;
+    }
+
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        line-height: 1;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .stat-label {
+        color: var(--text-secondary);
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 0.5rem;
+    }
+
+    .stat-change {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+
+    .stat-change.positive {
+        color: var(--color-success-600);
+    }
+
+    .stat-change.pulse {
+        color: var(--color-primary-600);
+        animation: statusPulse 2s infinite;
+    }
+
+    /* Filter Section - Using Base.html Design */
+    .filters-section {
+        background: var(--bg-primary);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        border: 1px solid var(--border-subtle);
+        box-shadow: var(--card-shadow);
+    }
+
+    .filters-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .filters-header h3 {
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .filters-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .filter-label {
+        font-weight: 600;
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+
+    .filter-select {
+        padding: 0.75rem;
+        border-radius: var(--radius);
+        border: 1px solid var(--border-color);
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .filter-select:focus {
+        outline: none;
+        border-color: var(--color-primary-500);
+        box-shadow: 0 0 0 3px var(--color-primary-100);
+    }
+
+    /* Search Container */
+    .search-container {
+        position: relative;
+        grid-column: span 2;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 0.75rem 1rem 0.75rem 2.5rem;
+        border-radius: var(--radius);
+        border: 1px solid var(--border-color);
+        background: var(--bg-primary);
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        font-family: 'Inter', sans-serif;
+        color: var(--text-primary);
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: var(--color-primary-500);
+        box-shadow: 0 0 0 3px var(--color-primary-100);
+    }
+
+    .search-input::placeholder {
+        color: var(--text-secondary);
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-secondary);
+    }
+
+    /* Reports Section */
+    .reports-section {
+        margin-bottom: 2rem;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .section-title {
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0;
+    }
+
+    .reports-grid {
+        display: grid;
+        gap: 1.5rem;
+    }
+
+    /* Report Cards - Using Base.html Design System */
+    .report-card {
+        background: var(--bg-primary);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        border: 1px solid var(--border-subtle);
+        transition: all 0.3s ease;
+        position: relative;
+        box-shadow: var(--card-shadow);
+    }
+
+    .report-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        border-color: var(--color-primary-300);
+    }
+
+    .report-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+
+    .report-type {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        font-family: 'Inter', sans-serif;
+    }
+
+    .report-status {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .status-submitted {
+        background: var(--color-primary-100);
+        color: var(--color-primary-700);
+    }
+
+    .status-processing {
+        background: var(--color-secondary-100);
+        color: var(--color-secondary-700);
+    }
+
+    .status-resolved {
+        background: var(--color-success-100);
+        color: var(--color-success-700);
+    }
+
+    .status-urgent {
+        background: var(--color-secondary-100);
+        color: var(--color-secondary-800);
+    }
+
+    .report-content {
+        margin-bottom: 1rem;
+    }
+
+    .report-description {
+        color: var(--text-primary);
+        line-height: 1.6;
+        margin-bottom: 1rem;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .report-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .detail-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .detail-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .detail-value {
+        color: var(--text-primary);
+        font-weight: 500;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .report-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .report-actions .btn {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: var(--radius);
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .report-actions .btn-primary {
+        background: var(--color-primary-500);
+        color: white;
+    }
+
+    .report-actions .btn-primary:hover {
+        background: var(--color-primary-600);
+        transform: translateY(-1px);
+    }
+
+    .report-actions .btn-secondary {
+        background: var(--color-grey-500);
+        color: white;
+    }
+
+    .report-actions .btn-secondary:hover {
+        background: var(--color-grey-600);
+        transform: translateY(-1px);
+    }
+
+    .report-actions .btn-success {
+        background: var(--color-success-500);
+        color: white;
+    }
+
+    .report-actions .btn-success:hover {
+        background: var(--color-success-600);
+        transform: translateY(-1px);
+    }
+
+    .report-actions .btn-outline {
+        background: transparent;
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+    }
+
+    .report-actions .btn-outline:hover {
+        border-color: var(--color-primary-500);
+        color: var(--color-primary-600);
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: var(--text-secondary);
+    }
+
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .empty-title {
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+    }
+
+    .empty-description {
+        margin-bottom: 2rem;
+        line-height: 1.6;
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Loading State */
+    .loading-skeleton {
+        background: linear-gradient(90deg, var(--color-grey-200) 25%, var(--color-grey-100) 50%, var(--color-grey-200) 75%);
+        background-size: 200% 100%;
+        animation: loading 1.5s infinite;
+        border-radius: var(--radius);
+    }
+
+    @keyframes loading {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+
+    .skeleton-text {
+        height: 1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .skeleton-title {
+        height: 1.5rem;
+        width: 60%;
+        margin-bottom: 1rem;
+    }
+
+    /* Notification */
+    .notification {
+        position: fixed;
+        top: 2rem;
+        right: 2rem;
+        background: var(--color-success-500);
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: var(--radius);
+        box-shadow: var(--card-shadow);
+        transform: translateX(400px);
+        transition: transform 0.3s ease;
+        z-index: 1000;
+        font-family: 'Inter', sans-serif;
+        font-weight: 500;
+    }
+
+    .notification.show {
+        transform: translateX(0);
+    }
+
+    /* Animations */
+    .fade-in {
+        animation: fadeIn 0.5s ease-in;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Dark Theme Support */
+    [data-theme="dark"] .dashboard-content {
+        background: linear-gradient(135deg, var(--color-grey-800) 0%, var(--color-grey-700) 100%);
+    }
+
+    [data-theme="dark"] .stat-card,
+    [data-theme="dark"] .filters-section,
+    [data-theme="dark"] .report-card {
+        background: var(--color-grey-800);
+        border-color: var(--color-grey-600);
+    }
+
+    [data-theme="dark"] .loading-skeleton {
+        background: linear-gradient(90deg, var(--color-grey-700) 25%, var(--color-grey-600) 50%, var(--color-grey-700) 75%);
+        background-size: 200% 100%;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .dashboard-content {
+            padding: 1.5rem;
+        }
+
+        .dashboard-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .dashboard-actions {
+            width: 100%;
+            justify-content: flex-start;
+        }
+
+        .nav-links {
+            width: 100%;
+            justify-content: flex-start;
+        }
+
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .filters-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .search-container {
+            grid-column: span 1;
+        }
+
+        .report-details {
+            grid-template-columns: 1fr;
+        }
+
+        .report-actions {
+            flex-direction: column;
+        }
+
+        .nav-links .btn-primary,
+        .nav-links .btn-secondary {
+            font-size: 0.8rem;
+            padding: 0.5rem 0.75rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .dashboard-content {
+            padding: 1rem;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+        }
+
+        .nav-links {
+            flex-direction: column;
+            width: 100%;
+        }
+    }
+
+    /* High Contrast Mode Support */
+    [data-contrast="high"] .stat-card,
+    [data-contrast="high"] .filters-section,
+    [data-contrast="high"] .report-card {
+        border: 2px solid var(--border-color);
+    }
+
+    [data-contrast="high"] .report-card:hover {
+        border-color: var(--color-primary-600);
+        border-width: 3px;
+    }
+
+    /* Reduced Motion Support */
+    @media (prefers-reduced-motion: reduce) {
+        * {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+
+        .stat-change.pulse {
+            animation: none;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-content">
+        <!-- Dashboard Header -->
+        <div class="dashboard-header">
+            <div>
+                <h1 class="dashboard-title heading-1">
+                    📋 My Emergency Reports
+                </h1>
+                <p class="dashboard-subtitle body-2">
+                    Track the status of your submitted reports and view updates
+                </p>
+            </div>
+            <div class="dashboard-actions">
+                <button class="btn-primary" onclick="refreshReports()">
+                    🔄 Refresh
+                </button>
+                <button class="btn-primary" onclick="exportAllReports()">
+                    💾 Export All
+                </button>
+                <a href="/submit-report" class="btn-secondary" style="text-decoration: none;">
+                    ➕ New Report
+                </a>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">📝</div>
+                    <div class="stat-change positive">
+                        ↗️ +2 this week
+                    </div>
+                </div>
+                <div class="stat-number" id="totalReports">0</div>
+                <div class="stat-label">Total Reports</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">⏳</div>
+                    <div class="stat-change pulse">
+                        🔄 Active
+                    </div>
+                </div>
+                <div class="stat-number" id="pendingReports">0</div>
+                <div class="stat-label">Pending</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-change positive">
+                        ↗️ +1 today
+                    </div>
+                </div>
+                <div class="stat-number" id="resolvedReports">0</div>
+                <div class="stat-label">Resolved</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-change">
+                        📊 Average
+                    </div>
+                </div>
+                <div class="stat-number" id="avgResponseTime">--</div>
+                <div class="stat-label">Avg Response</div>
+            </div>
+        </div>
+
+        <!-- Filters Section -->
+        <div class="filters-section">
+            <div class="filters-header">
+                <h3 class="heading-3">🔍 Filter & Search Reports</h3>
+                <button class="btn-outline" onclick="clearFilters()">
+                    Clear All
+                </button>
+            </div>
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label class="filter-label">Status:</label>
+                    <select id="statusFilter" class="filter-select" onchange="applyFilters()">
+                        <option value="all">All Reports</option>
+                        <option value="submitted">Submitted</option>
+                        <option value="processing">Processing</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label class="filter-label">Type:</label>
+                    <select id="typeFilter" class="filter-select" onchange="applyFilters()">
+                        <option value="all">All Types</option>
+                        <option value="text">Text Reports</option>
+                        <option value="voice">Voice Reports</option>
+                        <option value="photo">Photo Reports</option>
+                        <option value="discreet">Discreet Reports</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label class="filter-label">Date:</label>
+                    <select id="dateFilter" class="filter-select" onchange="applyFilters()">
+                        <option value="all">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="year">This Year</option>
+                    </select>
+                </div>
+
+                <div class="search-container">
+                    <div class="search-icon">🔍</div>
+                    <input type="text" id="searchInput" class="search-input" 
+                           placeholder="Search reports by description, location, or ID..." 
+                           oninput="applyFilters()">
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Section -->
+        <div class="reports-section">
+            <div class="section-header">
+                <h2 class="section-title heading-2">
+                    📊 Your Reports
+                    <span id="reportCount" class="body-3" style="color: var(--text-secondary);">(0 reports)</span>
+                </h2>
+                <select id="sortSelect" class="filter-select" onchange="applyFilters()">
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="status">By Status</option>
+                    <option value="urgency">By Urgency</option>
+                </select>
+            </div>
+
+            <!-- Reports Grid -->
+            <div class="reports-grid" id="reportsGrid">
+                <!-- Reports will be populated here -->
+            </div>
+
+            <!-- Empty State -->
+            <div class="empty-state" id="emptyState" style="display: none;">
+                <div class="empty-icon">📭</div>
+                <h3 class="empty-title heading-3">No Reports Found</h3>
+                <p class="empty-description body-2">
+                    You haven't submitted any emergency reports yet, or no reports match your current filters.
+                </p>
+                <a href="/submit-report" class="btn-primary" style="text-decoration: none;">
+                    📝 Submit Your First Report
+                </a>
+            </div>
+
+            <!-- Loading State -->
+            <div class="loading-state" id="loadingState" style="display: none;">
+                <div class="report-card">
+                    <div class="loading-skeleton skeleton-title"></div>
+                    <div class="loading-skeleton skeleton-text"></div>
+                    <div class="loading-skeleton skeleton-text" style="width: 80%;"></div>
+                    <div class="loading-skeleton skeleton-text" style="width: 60%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Notification -->
+<div class="notification" id="notification"></div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+// Reports Dashboard Management - Integrated with Base.html Design System
+class ReportsDashboard {
+    constructor() {
+        this.reports = [];
+        this.filteredReports = [];
+        this.filters = {
+            status: 'all',
+            type: 'all',
+            date: 'all',
+            search: '',
+            sort: 'newest'
+        };
+        
+        this.init();
+    }
+    
+    init() {
+        this.loadReports();
+        this.updateStats();
+        this.renderReports();
+        this.setupEventListeners();
+    }
+    
+    loadReports() {
+        // Load reports from localStorage
+        const savedReports = localStorage.getItem('userReports');
+        if (savedReports) {
+            this.reports = JSON.parse(savedReports);
+        } else {
+            // Create sample data for demonstration
+            this.reports = this.generateSampleReports();
+            localStorage.setItem('userReports', JSON.stringify(this.reports));
+        }
+        
+        this.filteredReports = [...this.reports];
+    }
+    
+    generateSampleReports() {
+        const sampleReports = [
+            {
+                id: Date.now() - 86400000,
+                type: 'voice',
+                status: 'resolved',
+                title: 'Medical Emergency - Chest Pain',
+                description: 'Elderly person experiencing severe chest pain and shortness of breath',
+                location: '123 Main St, Downtown',
+                timestamp: new Date(Date.now() - 86400000).toISOString(),
+                urgency: 'high',
+                responders: ['Emergency Medical Services', 'Fire Department'],
+                responseTime: '4 minutes'
+            },
+            {
+                id: Date.now() - 172800000,
+                type: 'text',
+                status: 'processing',
+                title: 'Fire Hazard - Smoke Detection',
+                description: 'Heavy smoke visible from apartment building, possible fire',
+                location: '456 Oak Ave, Residential District',
+                timestamp: new Date(Date.now() - 172800000).toISOString(),
+                urgency: 'critical',
+                responders: ['Fire Department'],
+                responseTime: 'pending'
+            },
+            {
+                id: Date.now() - 259200000,
+                type: 'photo',
+                status: 'submitted',
+                title: 'Traffic Accident - Multiple Vehicles',
+                description: 'Multi-car collision on highway with potential injuries',
+                location: 'Highway 101, Mile Marker 45',
+                timestamp: new Date(Date.now() - 259200000).toISOString(),
+                urgency: 'medium',
+                responders: ['Police', 'Emergency Medical Services'],
+                responseTime: 'pending'
+            }
+        ];
+        
+        return sampleReports;
+    }
+    
+    updateStats() {
+        const total = this.reports.length;
+        const pending = this.reports.filter(r => r.status === 'submitted' || r.status === 'processing').length;
+        const resolved = this.reports.filter(r => r.status === 'resolved').length;
+        const avgTime = this.calculateAverageResponseTime();
+        
+        document.getElementById('totalReports').textContent = total;
+        document.getElementById('pendingReports').textContent = pending;
+        document.getElementById('resolvedReports').textContent = resolved;
+        document.getElementById('avgResponseTime').textContent = avgTime;
+    }
+    
+    calculateAverageResponseTime() {
+        const resolvedReports = this.reports.filter(r => r.status === 'resolved' && r.responseTime !== 'pending');
+        if (resolvedReports.length === 0) return '--';
+        
+        // Simple average calculation (assuming response times are in minutes)
+        const times = resolvedReports.map(r => parseInt(r.responseTime) || 0);
+        const average = times.reduce((sum, time) => sum + time, 0) / times.length;
+        return `${Math.round(average)} min`;
+    }
+    
+    applyFilters() {
+        let filtered = [...this.reports];
+        
+        // Status filter
+        if (this.filters.status !== 'all') {
+            filtered = filtered.filter(report => report.status === this.filters.status);
+        }
+        
+        // Type filter
+        if (this.filters.type !== 'all') {
+            filtered = filtered.filter(report => report.type === this.filters.type);
+        }
+        
+        // Date filter
+        if (this.filters.date !== 'all') {
+            const now = new Date();
+            filtered = filtered.filter(report => {
+                const reportDate = new Date(report.timestamp);
+                switch (this.filters.date) {
+                    case 'today':
+                        return reportDate.toDateString() === now.toDateString();
+                    case 'week':
+                        return (now - reportDate) <= 7 * 24 * 60 * 60 * 1000;
+                    case 'month':
+                        return (now - reportDate) <= 30 * 24 * 60 * 60 * 1000;
+                    case 'year':
+                        return reportDate.getFullYear() === now.getFullYear();
+                    default:
+                        return true;
+                }
+            });
+        }
+        
+        // Search filter
+        if (this.filters.search) {
+            const searchTerm = this.filters.search.toLowerCase();
+            filtered = filtered.filter(report => 
+                report.title.toLowerCase().includes(searchTerm) ||
+                report.description.toLowerCase().includes(searchTerm) ||
+                report.location.toLowerCase().includes(searchTerm) ||
+                report.id.toString().includes(searchTerm)
+            );
+        }
+        
+        // Sort
+        filtered.sort((a, b) => {
+            switch (this.filters.sort) {
+                case 'newest':
+                    return new Date(b.timestamp) - new Date(a.timestamp);
+                case 'oldest':
+                    return new Date(a.timestamp) - new Date(b.timestamp);
+                case 'status':
+                    return a.status.localeCompare(b.status);
+                case 'urgency':
+                    const urgencyOrder = { critical: 3, high: 2, medium: 1, low: 0 };
+                    return (urgencyOrder[b.urgency] || 0) - (urgencyOrder[a.urgency] || 0);
+                default:
+                    return 0;
+            }
+        });
+        
+        this.filteredReports = filtered;
+        this.renderReports();
+    }
+    
+    renderReports() {
+        const grid = document.getElementById('reportsGrid');
+        const emptyState = document.getElementById('emptyState');
+        const reportCount = document.getElementById('reportCount');
+        
+        if (this.filteredReports.length === 0) {
+            grid.style.display = 'none';
+            emptyState.style.display = 'block';
+            reportCount.textContent = '(0 reports)';
+            return;
+        }
+        
+        grid.style.display = 'grid';
+        emptyState.style.display = 'none';
+        reportCount.textContent = `(${this.filteredReports.length} reports)`;
+        
+        grid.innerHTML = this.filteredReports.map(report => this.renderReportCard(report)).join('');
+    }
+    
+    renderReportCard(report) {
+        const statusClass = `status-${report.status}`;
+        const urgencyIcon = this.getUrgencyIcon(report.urgency);
+        const typeIcon = this.getTypeIcon(report.type);
+        const formattedDate = new Date(report.timestamp).toLocaleDateString();
+        const formattedTime = new Date(report.timestamp).toLocaleTimeString();
+        
+        return `
+            <div class="report-card fade-in" data-report-id="${report.id}">
+                <div class="report-header">
+                    <div class="report-type">
+                        ${typeIcon} ${report.title}
+                    </div>
+                    <div class="report-status ${statusClass}">
+                        ${report.status}
+                    </div>
+                </div>
+                
+                <div class="report-content">
+                    <p class="report-description body-2">${report.description}</p>
+                    
+                    <div class="report-details">
+                        <div class="detail-item">
+                            <span class="detail-label">Report ID</span>
+                            <span class="detail-value">#${report.id}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Type</span>
+                            <span class="detail-value">${report.type.charAt(0).toUpperCase() + report.type.slice(1)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Urgency</span>
+                            <span class="detail-value">${urgencyIcon} ${report.urgency.charAt(0).toUpperCase() + report.urgency.slice(1)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Location</span>
+                            <span class="detail-value">${report.location}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Submitted</span>
+                            <span class="detail-value">${formattedDate} at ${formattedTime}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Response Time</span>
+                            <span class="detail-value">${report.responseTime}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="report-actions">
+                    <button class="btn btn-primary" onclick="viewReportDetails('${report.id}')">
+                        👁️ View Details
+                    </button>
+                    <button class="btn btn-secondary" onclick="downloadReport('${report.id}')">
+                        💾 Download
+                    </button>
+                    ${report.status === 'submitted' ? 
+                        `<button class="btn btn-outline" onclick="editReport('${report.id}')">✏️ Edit</button>` : 
+                        ''
+                    }
+                    ${report.status === 'resolved' ? 
+                        `<button class="btn btn-success" onclick="provideFeedback('${report.id}')">⭐ Feedback</button>` : 
+                        ''
+                    }
+                </div>
+            </div>
+        `;
+    }
+    
+    getUrgencyIcon(urgency) {
+        const icons = {
+            critical: '🚨',
+            high: '⚠️',
+            medium: '🔶',
+            low: '🔵'
+        };
+        return icons[urgency] || '❓';
+    }
+    
+    getTypeIcon(type) {
+        const icons = {
+            voice: '🎤',
+            text: '📝',
+            photo: '📸',
+            discreet: '🔇'
+        };
+        return icons[type] || '📋';
+    }
+    
+    setupEventListeners() {
+        // Filter change listeners
+        document.getElementById('statusFilter').addEventListener('change', (e) => {
+            this.filters.status = e.target.value;
+            this.applyFilters();
+        });
+        
+        document.getElementById('typeFilter').addEventListener('change', (e) => {
+            this.filters.type = e.target.value;
+            this.applyFilters();
+        });
+        
+        document.getElementById('dateFilter').addEventListener('change', (e) => {
+            this.filters.date = e.target.value;
+            this.applyFilters();
+        });
+        
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            this.filters.search = e.target.value;
+            this.applyFilters();
+        });
+        
+        document.getElementById('sortSelect').addEventListener('change', (e) => {
+            this.filters.sort = e.target.value;
+            this.applyFilters();
+        });
+    }
+    
+    refresh() {
+        this.showNotification('🔄 Refreshing reports...');
+        this.loadReports();
+        this.updateStats();
+        this.applyFilters();
+        setTimeout(() => {
+            this.showNotification('✅ Reports refreshed successfully!');
+        }, 1000);
+    }
+    
+    exportAll() {
+        const dataStr = JSON.stringify(this.reports, null, 2);
+        const dataBlob = new Blob([dataStr], {type: 'application/json'});
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `emergency-reports-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        this.showNotification('💾 Reports exported successfully!');
+    }
+    
+    clearFilters() {
+        this.filters = {
+            status: 'all',
+            type: 'all',
+            date: 'all',
+            search: '',
+            sort: 'newest'
+        };
+        
+        // Reset form values
+        document.getElementById('statusFilter').value = 'all';
+        document.getElementById('typeFilter').value = 'all';
+        document.getElementById('dateFilter').value = 'all';
+        document.getElementById('searchInput').value = '';
+        document.getElementById('sortSelect').value = 'newest';
+        
+        this.applyFilters();
+        this.showNotification('🧹 Filters cleared!');
+    }
+    
+    showNotification(message) {
+        // Use the base.html notification system
+        if (window.portal && window.portal.showNotification) {
+            window.portal.showNotification(message, 'success');
+        } else {
+            // Fallback notification
+            const notification = document.getElementById('notification');
+            if (notification) {
+                notification.textContent = message;
+                notification.classList.add('show');
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+        }
+    }
+}
+
+// Global functions for button actions
+function viewReportDetails(reportId) {
+    dashboard.showNotification(`👁️ Viewing details for report #${reportId}`);
+    // In a real app, this would open a detailed view modal or navigate to details page
+    console.log('View report details:', reportId);
+}
+
+function downloadReport(reportId) {
+    const report = dashboard.reports.find(r => r.id == reportId);
+    if (report) {
+        const dataStr = JSON.stringify(report, null, 2);
+        const dataBlob = new Blob([dataStr], {type: 'application/json'});
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `emergency-report-${reportId}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        dashboard.showNotification(`💾 Report #${reportId} downloaded!`);
+    }
+}
+
+function editReport(reportId) {
+    dashboard.showNotification(`✏️ Edit functionality coming soon for report #${reportId}`);
+    // In a real app, this would open edit form or navigate to edit page
+    console.log('Edit report:', reportId);
+}
+
+function provideFeedback(reportId) {
+    dashboard.showNotification(`⭐ Feedback form coming soon for report #${reportId}`);
+    // In a real app, this would open feedback modal
+    console.log('Provide feedback for report:', reportId);
+}
+
+function refreshReports() {
+    dashboard.refresh();
+}
+
+function exportAllReports() {
+    dashboard.exportAll();
+}
+
+function clearFilters() {
+    dashboard.clearFilters();
+}
+
+function applyFilters() {
+    dashboard.applyFilters();
+}
+
+// Initialize dashboard when page loads
+let dashboard;
+document.addEventListener('DOMContentLoaded', function() {
+    dashboard = new ReportsDashboard();
+    
+    // Add some loading animation
+    const loadingState = document.getElementById('loadingState');
+    if (loadingState) {
+        loadingState.style.display = 'block';
+        
+        setTimeout(() => {
+            loadingState.style.display = 'none';
+            dashboard.renderReports();
+        }, 1000);
+    }
+    
+    // Simulate real-time updates
+    setInterval(() => {
+        // Randomly update some report statuses for demo
+        if (Math.random() < 0.1) { // 10% chance every interval
+            const pendingReports = dashboard.reports.filter(r => r.status === 'submitted' || r.status === 'processing');
+            if (pendingReports.length > 0) {
+                const randomReport = pendingReports[Math.floor(Math.random() * pendingReports.length)];
+                if (randomReport.status === 'submitted') {
+                    randomReport.status = 'processing';
+                } else if (randomReport.status === 'processing') {
+                    randomReport.status = 'resolved';
+                    randomReport.responseTime = `${Math.floor(Math.random() * 15) + 1} minutes`;
+                }
+                
+                // Save updated reports
+                localStorage.setItem('userReports', JSON.stringify(dashboard.reports));
+                dashboard.updateStats();
+                dashboard.applyFilters();
+                
+                dashboard.showNotification(`📱 Report #${randomReport.id} status updated to ${randomReport.status}`);
+            }
+        }
+    }, 30000); // Check every 30 seconds
+});
+
+// Handle page visibility change to refresh when user returns
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && dashboard) {
+        dashboard.refresh();
+    }
+});
+</script>
+{% endblock %}
+
+

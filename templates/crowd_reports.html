@@ -1,0 +1,611 @@
+{% extends "base.html" %}
+
+{% block title %}Crowd Reports Viewer - Disaster Response Assistant{% endblock %}
+{% block page_title %}📋 Crowd Reports Viewer{% endblock %}
+{% block subtitle %}Real-time Community Emergency Reports{% endblock %}
+
+{% block header_actions %}
+<a href="/" style="display: inline-block; margin-top: 1rem; padding: 0.5rem 1rem; background-color: #1e40af; color: #fff; border-radius: 6px; text-decoration: none;">
+  ⬅️ Back to Home
+</a>
+<a href="/map-snapshot" style="display: inline-block; margin-top: 1rem; padding: 0.5rem 1rem; background-color: #059669; color: #fff; border-radius: 6px; text-decoration: none; margin-left: 0.5rem;">
+  🗺️ Map Tool
+</a>
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+  .report-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  
+  .stat-card {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-left: 4px solid #3b82f6;
+    text-align: center;
+  }
+  
+  .stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #1e40af;
+    margin-bottom: 0.25rem;
+  }
+  
+  .stat-label {
+    color: #6b7280;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  
+  .filters {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  
+  .filter-select {
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+  
+  .filter-button {
+    background: #16a34a;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+  }
+  
+  .filter-button:hover {
+    background: #15803d;
+  }
+  
+  .filter-button.secondary {
+    background: #6b7280;
+  }
+  
+  .filter-button.secondary:hover {
+    background: #4b5563;
+  }
+  
+  .reports-grid {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  
+  .report-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-left: 4px solid;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+  }
+  
+  .report-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .report-card.critical {
+    border-left-color: #dc2626;
+    background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
+  }
+  
+  .report-card.high {
+    border-left-color: #ea580c;
+    background: linear-gradient(135deg, #fff 0%, #fff7ed 100%);
+  }
+  
+  .report-card.moderate {
+    border-left-color: #ca8a04;
+    background: linear-gradient(135deg, #fff 0%, #fefce8 100%);
+  }
+  
+  .report-card.low {
+    border-left-color: #16a34a;
+    background: linear-gradient(135deg, #fff 0%, #f0fdf4 100%);
+  }
+  
+  .report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+  
+  .escalation-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  
+  .escalation-badge.critical {
+    background: #fecaca;
+    color: #991b1b;
+  }
+  
+  .escalation-badge.high {
+    background: #fed7aa;
+    color: #9a3412;
+  }
+  
+  .escalation-badge.moderate {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  
+  .escalation-badge.low {
+    background: #d1fae5;
+    color: #065f46;
+  }
+  
+  .tone-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    background: #f3f4f6;
+    color: #374151;
+    margin-left: 0.5rem;
+  }
+  
+  .report-message {
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #374151;
+    margin-bottom: 1rem;
+  }
+  
+  .report-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: #6b7280;
+    border-top: 1px solid #f3f4f6;
+    padding-top: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .timestamp-info {
+    text-align: right;
+  }
+  
+  .location-info {
+    color: #3b82f6;
+    font-weight: 500;
+  }
+  
+  /* Enhanced Action Buttons */
+  .report-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #f3f4f6;
+    flex-wrap: wrap;
+  }
+  
+  .action-btn {
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  
+  .map-btn {
+    background: #3b82f6;
+    color: white;
+  }
+  
+  .map-btn:hover {
+    background: #1e40af;
+    transform: translateY(-1px);
+    text-decoration: none;
+    color: white;
+  }
+  
+  .share-btn {
+    background: #6b7280;
+    color: white;
+  }
+  
+  .share-btn:hover {
+    background: #4b5563;
+  }
+  
+  .quick-map-btn {
+    background: #059669;
+    color: white;
+  }
+  
+  .quick-map-btn:hover {
+    background: #047857;
+    text-decoration: none;
+    color: white;
+  }
+  
+  .details-btn {
+    background: #7c3aed;
+    color: white;
+  }
+  
+  .details-btn:hover {
+    background: #5b21b6;
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6b7280;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+    animation: bounce 2s infinite;
+  }
+  
+  @keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+      transform: translateY(0);
+    }
+    40% {
+      transform: translateY(-10px);
+    }
+    60% {
+      transform: translateY(-5px);
+    }
+  }
+  
+  .export-section {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+  }
+  
+  .export-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  .last-updated {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    color: #0c4a6e;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+  
+  /* Coordinate badge styling */
+  .coord-badge {
+    background: #dcfce7;
+    color: #166534;
+    padding: 0.2rem 0.5rem;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Last Updated -->
+<div class="last-updated">
+  📡 Last Updated: {{ current_time.strftime("%B %d, %Y at %H:%M:%S") }} | Auto-refresh every 30 seconds
+</div>
+
+<!-- Statistics Cards -->
+<div class="report-stats">
+  <div class="stat-card">
+    <div class="stat-number">{{ reports|length }}</div>
+    <div class="stat-label">Total Reports</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ reports|selectattr('escalation', 'equalto', 'critical')|list|length }}</div>
+    <div class="stat-label">Critical Alerts</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ reports|selectattr('latitude')|list|length }}</div>
+    <div class="stat-label">With Location</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ reports|map(attribute='user')|select|reject('equalto', 'Anonymous')|list|length }}</div>
+    <div class="stat-label">Named Users</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<form method="get" class="filters">
+  <label for="tone">Tone:</label>
+  <select name="tone" id="tone" class="filter-select">
+    <option value="">All Tones</option>
+    <option value="urgent" {% if tone == 'urgent' %}selected{% endif %}>Urgent</option>
+    <option value="frantic" {% if tone == 'frantic' %}selected{% endif %}>Frantic</option>
+    <option value="helpless" {% if tone == 'helpless' %}selected{% endif %}>Helpless</option>
+    <option value="descriptive" {% if tone == 'descriptive' %}selected{% endif %}>Descriptive</option>
+    <option value="concerned" {% if tone == 'concerned' %}selected{% endif %}>Concerned</option>
+    <option value="neutral" {% if tone == 'neutral' %}selected{% endif %}>Neutral</option>
+  </select>
+
+  <label for="escalation">Escalation:</label>
+  <select name="escalation" id="escalation" class="filter-select">
+    <option value="">All Levels</option>
+    <option value="critical" {% if escalation == 'critical' %}selected{% endif %}>Critical</option>
+    <option value="high" {% if escalation == 'high' %}selected{% endif %}>High</option>
+    <option value="moderate" {% if escalation == 'moderate' %}selected{% endif %}>Moderate</option>
+    <option value="low" {% if escalation == 'low' %}selected{% endif %}>Low</option>
+  </select>
+
+  <input type="text" name="keyword" placeholder="Search messages..." value="{{ keyword or '' }}" class="filter-select" />
+
+  <button type="submit" class="filter-button">🔍 Filter</button>
+  <a href="/crowd-reports" class="filter-button secondary">♻️ Reset</a>
+</form>
+
+<!-- Export Section -->
+<div class="export-section">
+  <h3 style="margin: 0 0 1rem 0; color: #374151;">📦 Export Options</h3>
+  <div class="export-buttons">
+    <a href="/export-reports.csv?tone={{ tone }}&escalation={{ escalation }}&keyword={{ keyword }}" class="filter-button" style="background: #6d28d9; text-decoration: none; display: inline-block;">
+      📊 Export CSV
+    </a>
+    
+    <a href="/export-reports.json?tone={{ tone }}&escalation={{ escalation }}&keyword={{ keyword }}" class="filter-button" style="background: #334155; text-decoration: none; display: inline-block;">
+      🔧 Export JSON
+    </a>
+    
+    <a href="/api/export-map-data?format=kml&tone={{ tone }}&escalation={{ escalation }}" class="filter-button" style="background: #dc2626; text-decoration: none; display: inline-block;">
+      🌍 Export KML
+    </a>
+  </div>
+</div>
+
+{% if reports %}
+<div class="reports-grid">
+  {% for report in reports %}
+  <div class="report-card {{ report.escalation | lower }}" onclick="highlightReport('{{ report.id }}')">
+    <div class="report-header">
+      <div>
+        <span class="escalation-badge {{ report.escalation.lower() }}">
+          {% if report.escalation == 'critical' %}🚨{% elif report.escalation == 'high' %}⚠️{% elif report.escalation == 'moderate' %}📊{% else %}📝{% endif %}
+          {{ report.escalation.title() }}
+        </span>
+        {% if report.tone %}
+          <span class="tone-badge">{{ report.tone.title() }}</span>
+        {% endif %}
+      </div>
+      <div style="font-size: 0.8rem; color: #6b7280;">
+        #{{ report.id }}
+      </div>
+    </div>
+    
+    <div class="report-message">
+      {{ report.message or 'No message provided' }}
+    </div>
+    
+    <div class="report-meta">
+      <div class="user-info">
+        <span>👤 {{ report.user or 'Anonymous' }}</span>
+        {% if report.location %}
+          <span class="location-info">📍 {{ report.location }}</span>
+        {% endif %}
+        {% if report.latitude and report.longitude %}
+          <span class="coord-badge">{{ "%.4f"|format(report.latitude) }}, {{ "%.4f"|format(report.longitude) }}</span>
+        {% endif %}
+      </div>
+      <div class="timestamp-info">
+        {% if report.timestamp %}
+          <div>{{ report.timestamp[:10] }}</div>
+          <div>{{ report.timestamp[11:19] }}</div>
+        {% else %}
+          <div>Unknown time</div>
+        {% endif %}
+      </div>
+    </div>
+    
+    <!-- Enhanced Action Buttons -->
+    <div class="report-actions">
+      {% if report.latitude and report.longitude %}
+      <a href="/map-snapshot/{{ report.id }}" class="action-btn map-btn" target="_blank" title="View detailed map for this report">
+        🗺️ View Map
+      </a>
+      <a href="/map-snapshot?lat={{ report.latitude }}&lon={{ report.longitude }}" class="action-btn quick-map-btn" target="_blank" title="Quick coordinate map">
+        📍 Quick Map
+      </a>
+      {% endif %}
+      <button onclick="shareReport(event, '{{ report.id }}')" class="action-btn share-btn" title="Share this report">
+        🔗 Share
+      </button>
+      <button onclick="showReportDetails(event, '{{ report.id }}')" class="action-btn details-btn" title="Show full details">
+        ℹ️ Details
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="empty-state-icon">📭</div>
+  <h3>No Reports Found</h3>
+  <p>No crowd reports match your current filters.</p>
+  <p style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
+    Try adjusting your filters or <a href="/crowd-reports" style="color: #3b82f6;">reset to see all reports</a>
+  </p>
+  <a href="/submit-crowd-report" style="display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background-color: #16a34a; color: #fff; border-radius: 8px; text-decoration: none; font-weight: 500;">
+    📝 Submit First Report
+  </a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Enhanced report interaction
+function highlightReport(reportId) {
+  console.log('📋 Report selected:', reportId);
+  // Could add visual feedback here
+}
+
+function shareReport(event, reportId) {
+  event.stopPropagation(); // Prevent card click
+  const reportUrl = `${window.location.origin}/crowd-reports?keyword=${reportId}`;
+  const mapUrl = `${window.location.origin}/map-snapshot/${reportId}`;
+  
+  if (navigator.share) {
+    navigator.share({
+      title: `Emergency Report #${reportId}`,
+      text: 'View this emergency report and its location',
+      url: mapUrl
+    }).catch(console.error);
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(mapUrl).then(() => {
+      showToast('📋 Map link copied to clipboard!', 'success');
+    }).catch(() => {
+      prompt('Copy this link:', mapUrl);
+    });
+  } else {
+    prompt('Copy this link:', mapUrl);
+  }
+}
+
+function showReportDetails(event, reportId) {
+  event.stopPropagation(); // Prevent card click
+  // Future enhancement: show modal with full details
+  console.log('📝 Show details for report:', reportId);
+  // Could open a modal or navigate to detail page
+  alert(`Report #${reportId} details\n\nThis would show expanded report information in a modal.`);
+}
+
+function showToast(message, type = 'info') {
+  // Simple toast notification
+  const toast = document.createElement('div');
+  const backgroundColor = type === 'success' ? '#16a34a' : '#3b82f6';
+  
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: ${backgroundColor};
+    color: white;
+    padding: 1rem;
+    border-radius: 8px;
+    z-index: 10000;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  `;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.remove();
+  }, 3000);
+}
+
+// Auto-refresh functionality
+let refreshInterval;
+
+function startAutoRefresh() {
+  refreshInterval = setInterval(() => {
+    if (navigator.onLine && !document.hidden) {
+      console.log('🔄 Auto-refreshing reports...');
+      window.location.reload();
+    }
+  }, 30000);
+}
+
+function stopAutoRefresh() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+  }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+  startAutoRefresh();
+  
+  // Pause refresh when page is hidden
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopAutoRefresh();
+    } else {
+      startAutoRefresh();
+    }
+  });
+  
+  console.log('📋 Enhanced Crowd Reports Viewer loaded');
+  console.log('🗺️ Map integration: Click map buttons to view locations');
+});
+
+// Cleanup
+window.addEventListener('beforeunload', stopAutoRefresh);
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey) {
+    switch(e.key) {
+      case 'm':
+        e.preventDefault();
+        window.open('/map-snapshot', '_blank');
+        break;
+      case 'r':
+        e.preventDefault();
+        window.location.reload();
+        break;
+    }
+  }
+});
+</script>
+{% endblock %}
+
+{% block ai_status %}{% endblock %}
+
+
